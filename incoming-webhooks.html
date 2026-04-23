@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apprentice — Incoming Webhooks</title>
+  <link rel="stylesheet" href="incoming-webhooks.css">
+</head>
+<body>
+
+  <!-- ====== Admin chrome (fake WordPress admin feel) ====== -->
+  <header class="admin-bar">
+    <div class="admin-bar__inner">
+      <div class="admin-bar__brand">
+        <span class="admin-bar__logo">⌘</span>
+        <span>Thrive Apprentice</span>
+      </div>
+      <div class="admin-bar__user">
+        <span class="admin-bar__hint">Interactive prototype — no data is saved</span>
+        <button class="btn btn--ghost btn--sm" id="resetBtn" title="Start over">↻ Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app">
+
+    <div class="app__frame">
+
+      <!-- ====== Breadcrumb (always visible) ====== -->
+      <div class="crumb">
+        <span class="crumb__item">Thrive Apprentice</span>
+        <span class="crumb__sep">›</span>
+        <span class="crumb__item">Settings</span>
+        <span class="crumb__sep">›</span>
+        <span class="crumb__item crumb__item--active" id="crumbActive">Incoming Webhooks</span>
+      </div>
+
+      <!-- ============================================= -->
+      <!-- VIEW: EMPTY STATE                             -->
+      <!-- ============================================= -->
+      <section class="view view--active" data-view="empty">
+        <div class="empty-state">
+          <div class="empty-state__illustration">
+            <svg viewBox="0 0 80 80" width="80" height="80" aria-hidden="true">
+              <circle cx="40" cy="40" r="36" fill="#FFE8D6"/>
+              <path d="M24 40h16l4-8 4 16 4-8h8" stroke="#E67E22" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="40" cy="40" r="36" fill="none" stroke="#E67E22" stroke-width="2" stroke-dasharray="4 4"/>
+            </svg>
+          </div>
+          <h2 class="empty-state__title">No incoming webhooks yet</h2>
+          <p class="empty-state__text">
+            Automatically grant course access when customers buy through ThriveCart, Stripe, SamCart, or any other tool that sends webhooks.
+          </p>
+          <button class="btn btn--primary btn--large" data-action="create-webhook">
+            <span class="btn__icon">+</span> Add Your First Webhook
+          </button>
+
+          <div class="use-cases">
+            <h3 class="use-cases__title">Common Use Cases</h3>
+            <ul class="use-cases__list">
+              <li class="use-case">
+                <span class="use-case__icon">🛒</span>
+                <div>
+                  <div class="use-case__label">ThriveCart / SamCart Purchase</div>
+                  <div class="use-case__detail">→ Grant course access automatically</div>
+                </div>
+              </li>
+              <li class="use-case">
+                <span class="use-case__icon">💳</span>
+                <div>
+                  <div class="use-case__label">Stripe Subscription Active</div>
+                  <div class="use-case__detail">→ Grant access while subscription is live</div>
+                </div>
+              </li>
+              <li class="use-case">
+                <span class="use-case__icon">❌</span>
+                <div>
+                  <div class="use-case__label">Stripe Subscription Canceled</div>
+                  <div class="use-case__detail">→ Automatically revoke access</div>
+                </div>
+              </li>
+              <li class="use-case">
+                <span class="use-case__icon">👤</span>
+                <div>
+                  <div class="use-case__label">External CRM Contact Created</div>
+                  <div class="use-case__detail">→ Create user and enroll in course</div>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <a href="#" class="link-arrow">View documentation →</a>
+        </div>
+      </section>
+
+      <!-- ============================================= -->
+      <!-- VIEW: LIST                                    -->
+      <!-- ============================================= -->
+      <section class="view" data-view="list">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Incoming Webhooks</h1>
+            <p class="page-subtitle">Let external systems grant or revoke course access by sending a webhook to your site.</p>
+          </div>
+          <button class="btn btn--primary" data-action="create-webhook">
+            <span class="btn__icon">+</span> Add Incoming Webhook
+          </button>
+        </div>
+        <div class="webhook-list" id="webhookList"></div>
+      </section>
+
+      <!-- ============================================= -->
+      <!-- VIEW: EDIT (contains all 4 tabs)              -->
+      <!-- ============================================= -->
+      <section class="view" data-view="edit">
+        <div class="edit-header">
+          <a href="#" class="back-link" data-action="back-to-list">‹ Back to Incoming Webhooks</a>
+        </div>
+
+        <div class="edit-title-row">
+          <div class="edit-title-row__input">
+            <label class="field-label" for="webhookName">Name</label>
+            <input type="text" class="input input--title" id="webhookName" placeholder="e.g., ThriveCart — Photography Masterclass">
+          </div>
+          <div class="edit-title-row__right">
+            <label class="toggle">
+              <input type="checkbox" id="webhookEnabled">
+              <span class="toggle__track"><span class="toggle__thumb"></span></span>
+              <span class="toggle__label" id="enabledLabel">Enabled</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab tab--active" data-tab="setup">Setup</button>
+          <button class="tab" data-tab="mapping">Field Mapping <span class="tab__badge" id="mappingBadge" hidden>!</span></button>
+          <button class="tab" data-tab="security">Security</button>
+          <button class="tab" data-tab="logs">Logs <span class="tab__count" id="logCount" hidden>0</span></button>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB: SETUP                                    -->
+        <!-- ADHD-friendly redesign:                       -->
+        <!--   • 3 numbered steps in a visual stepper      -->
+        <!--   • ONE primary CTA on screen at any time     -->
+        <!--   • No Cancel (use back-link at top)          -->
+        <!--   • No Save button here (lives on Security    -->
+        <!--     tab as the single final action)           -->
+        <!-- ============================================= -->
+        <div class="tab-panel tab-panel--active" data-panel="setup">
+
+          <div class="setup-stepper">
+
+            <!-- STEP 1 — Configure behavior -->
+            <section class="setup-step" data-step="1">
+              <span class="setup-step__num" aria-hidden="true">1</span>
+              <div class="setup-step__content">
+                <h3 class="setup-step__title">What should happen?</h3>
+                <p class="setup-step__sub">Pick the action and the product it applies to.</p>
+                <div class="setup-step__body">
+                  <div class="select-wrap">
+                    <select class="input input--select" id="actionType">
+                      <option value="find_create_grant">Find or Create User, Then Grant Access</option>
+                      <option value="grant">Grant Access (user must already exist)</option>
+                      <option value="revoke">Revoke Access</option>
+                    </select>
+                  </div>
+
+                  <label class="field-label field-label--spaced">To this product:</label>
+                  <div class="select-wrap">
+                    <select class="input input--select" id="productId">
+                      <option value="">— Select a product —</option>
+                      <option value="photo-master">Photography Masterclass</option>
+                      <option value="photo-advanced">Advanced Photography</option>
+                      <option value="portrait">Portrait Lighting</option>
+                    </select>
+                  </div>
+
+                  <div class="checkbox-group" id="createUserWrap">
+                    <label class="check">
+                      <input type="checkbox" id="createUser" checked>
+                      <span class="check__label">If user doesn't exist, create a new account</span>
+                    </label>
+                  </div>
+
+                  <div class="nested-block" id="nestedBlock">
+                    <label class="field-label">Default role for new users:</label>
+                    <div class="select-wrap">
+                      <select class="input input--select input--sm">
+                        <option>Subscriber</option>
+                        <option>Customer</option>
+                        <option>Student</option>
+                      </select>
+                    </div>
+                    <label class="check">
+                      <input type="checkbox" checked>
+                      <span class="check__label">Send new account welcome email</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- STEP 2 — Give URL to external tool -->
+            <section class="setup-step" data-step="2">
+              <span class="setup-step__num" aria-hidden="true">2</span>
+              <div class="setup-step__content">
+                <h3 class="setup-step__title">Paste this URL into your external tool</h3>
+                <p class="setup-step__sub">ThriveCart, Stripe, SamCart — wherever your request will come from.</p>
+                <div class="setup-step__body">
+                  <div class="input-group">
+                    <input type="text" class="input input--url" id="webhookUrl" readonly>
+                    <button class="btn btn--ghost btn--icon" data-action="copy-url">📋 Copy</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- STEP 3 — Test (the focal action: ONE big button) -->
+            <section class="setup-step setup-step--focal" data-step="3">
+              <span class="setup-step__num" aria-hidden="true">3</span>
+              <div class="setup-step__content">
+                <h3 class="setup-step__title">Send a test request</h3>
+                <p class="setup-step__sub">We'll capture the data automatically so you can finish setup in one click.</p>
+                <div class="setup-step__body">
+
+                  <div class="test-block" id="testBlock">
+
+                    <!-- STATE A: Idle — ONE pulsing primary CTA + subtle text link -->
+                    <div class="test-block__state" data-test-state="idle">
+                      <button class="btn btn--primary btn--xl btn--pulse" data-action="start-listening">
+                        🎧 Listen for Test Request
+                      </button>
+                      <button class="test-block__link" data-action="paste-sample">
+                        Paste a sample payload instead
+                      </button>
+                    </div>
+
+                    <!-- STATE B: Listening -->
+                    <div class="test-block__state" data-test-state="listening" hidden>
+                      <div class="listening-state">
+                        <div class="listening-state__pulse">
+                          <div class="pulse-ring"></div>
+                          <div class="pulse-ring pulse-ring--2"></div>
+                          <div class="pulse-ring pulse-ring--3"></div>
+                          <div class="pulse-dot">🎧</div>
+                        </div>
+                        <h2 class="listening-state__title">Listening for incoming request…</h2>
+                        <p class="listening-state__subtext">Trigger a test webhook from your external tool now.</p>
+                        <div class="countdown">
+                          Time remaining: <strong id="countdownValue">0:60</strong>
+                        </div>
+                        <div class="listening-state__actions">
+                          <button class="btn btn--primary" data-action="simulate-payload" title="Demo: pretend a webhook arrived">⚡ Simulate Incoming (Demo)</button>
+                          <button class="test-block__link" data-action="cancel-listening">Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- STATE C: Captured — ONE pulsing primary CTA -->
+                    <div class="test-block__state" data-test-state="captured" hidden>
+                      <div class="captured-banner">
+                        <div class="captured-banner__icon">✓</div>
+                        <div class="captured-banner__text">
+                          <strong>Payload captured!</strong>
+                          <span>Received a test webhook from ThriveCart.</span>
+                        </div>
+                      </div>
+                      <button class="btn btn--primary btn--xl btn--pulse" data-action="go-mapping">
+                        Next: Review Fields →
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- No bottom Cancel / Save here. Save lives on Security tab as the single final action. -->
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB: FIELD MAPPING                            -->
+        <!-- ============================================= -->
+        <div class="tab-panel" data-panel="mapping">
+
+          <div class="mapping-empty" id="mappingEmpty">
+            <div class="mapping-empty__icon">📭</div>
+            <h3>No payload captured yet</h3>
+            <p>Go back to Setup and send a test webhook to your endpoint so we can help you map fields.</p>
+            <button class="btn btn--primary" data-action="go-setup">← Back to Setup</button>
+          </div>
+
+          <div class="mapping-content" id="mappingContent" hidden>
+
+            <!-- Email auto-detected banner (only shows if email was auto-matched) -->
+            <div class="detect-banner" id="detectBanner" hidden>
+              <div class="detect-banner__icon">✓</div>
+              <div class="detect-banner__text">
+                <strong>Detected email field</strong>
+                <span>We'll use <code id="detectedEmailPath">customer.email</code> to identify users.</span>
+              </div>
+            </div>
+
+            <!-- SMART MATCH VIEW (default) -->
+            <div class="smart-match" id="smartMatchView">
+              <div class="smart-match__header">
+                <h3 class="smart-match__title">
+                  <span id="smartMatchTitle">Auto-matched 3 fields from your payload</span>
+                </h3>
+                <button class="btn btn--ghost btn--sm" data-action="toggle-advanced">
+                  ⚙ Advanced: Edit manually
+                </button>
+              </div>
+
+              <div class="smart-fields" id="smartFields"></div>
+
+              <div class="smart-match__more">
+                <button class="smart-match__more-btn" data-action="toggle-more-fields" id="toggleMoreBtn">
+                  <span id="toggleMoreLabel">+ Add more fields</span>
+                  <span class="smart-match__more-count" id="toggleMoreCount"></span>
+                </button>
+                <div class="smart-fields smart-fields--extra" id="moreFields" hidden></div>
+              </div>
+            </div>
+
+            <!-- ADVANCED / MANUAL VIEW -->
+            <div class="mapping-advanced" id="advancedView" hidden>
+              <div class="mapping-toolbar">
+                <p class="mapping-intro">Click a payload field on the left, then click a target slot on the right to map it.</p>
+                <button class="btn btn--ghost btn--sm" data-action="toggle-advanced">← Back to auto-match</button>
+              </div>
+              <div class="mapping-grid">
+                <div class="mapping-col">
+                  <div class="mapping-col__header">
+                    <span class="mapping-col__title">Your Payload (ThriveCart)</span>
+                    <span class="tag tag--green">Captured just now</span>
+                  </div>
+                  <div class="json-tree" id="jsonTree"></div>
+                </div>
+                <div class="mapping-col">
+                  <div class="mapping-col__header">
+                    <span class="mapping-col__title">Apprentice Fields</span>
+                  </div>
+                  <div id="fieldSlots"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn--ghost btn--sm" data-action="replay-payload">↻ Replay payload to test mapping</button>
+              <button class="btn btn--primary" data-action="save-mapping" id="saveMappingBtn" disabled>Continue to Security →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB: SECURITY                                 -->
+        <!-- ============================================= -->
+        <div class="tab-panel" data-panel="security">
+          <h3 class="form-section__title">How should we verify incoming requests are legitimate?</h3>
+          <div class="radio-options">
+
+            <label class="radio-option">
+              <input type="radio" name="sec" value="none" class="radio">
+              <div class="radio-option__body">
+                <div class="radio-option__title">None</div>
+                <div class="radio-option__desc">Anyone with the URL can trigger this webhook.</div>
+                <div class="radio-option__warn">⚠ Only use for internal tools or low-risk actions.</div>
+              </div>
+            </label>
+
+            <label class="radio-option radio-option--selected">
+              <input type="radio" name="sec" value="shared" class="radio" checked>
+              <div class="radio-option__body">
+                <div class="radio-option__title">Shared Secret <span class="badge badge--recommended">Recommended</span></div>
+                <div class="radio-option__desc">Sender must include a matching secret in a header. Works with ThriveCart, SamCart, and most CRMs.</div>
+                <div class="radio-option__extras" data-sec-details="shared">
+                  <div class="input-pair">
+                    <label class="field-label">Header name</label>
+                    <input type="text" class="input" value="X-Webhook-Secret">
+                  </div>
+                  <div class="input-pair">
+                    <label class="field-label">Secret value</label>
+                    <div class="input-group">
+                      <input type="password" class="input input--mono" id="secretValue" value="tva_whk_a7f9b2c4e8d1f3a5b7c9d2e4f6a8b0c2">
+                      <button class="btn btn--ghost btn--icon" data-action="toggle-secret">👁 Reveal</button>
+                      <button class="btn btn--ghost btn--icon" data-action="regen-secret">🔄 Regenerate</button>
+                    </div>
+                    <p class="field-hint">ⓘ Paste this value into your external tool's webhook header.</p>
+                  </div>
+                </div>
+              </div>
+            </label>
+
+            <label class="radio-option">
+              <input type="radio" name="sec" value="hmac" class="radio">
+              <div class="radio-option__body">
+                <div class="radio-option__title">HMAC-SHA256 <span class="badge badge--pro">Advanced</span></div>
+                <div class="radio-option__desc">Payload is cryptographically signed. Recommended for Stripe, GitHub, and enterprise integrations.</div>
+              </div>
+            </label>
+
+          </div>
+
+          <hr class="divider">
+
+          <section class="form-section">
+            <h3 class="form-section__title">Rate Limit</h3>
+            <div class="select-wrap select-wrap--sm">
+              <select class="input input--select">
+                <option>60 requests per minute (default)</option>
+                <option>120 requests per minute</option>
+                <option>300 requests per minute</option>
+                <option>Unlimited</option>
+              </select>
+            </div>
+            <p class="field-hint">Requests beyond this limit will receive HTTP 429 and be logged.</p>
+          </section>
+
+          <div class="form-actions form-actions--end">
+            <button class="btn btn--primary btn--large" data-action="save-webhook" id="saveWebhookBtn">Save &amp; Activate Webhook</button>
+          </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB: LOGS                                     -->
+        <!-- ============================================= -->
+        <div class="tab-panel" data-panel="logs">
+          <div class="logs-toolbar">
+            <div class="logs-toolbar__left">
+              <div class="select-wrap select-wrap--sm">
+                <select class="input input--select input--sm">
+                  <option>All statuses</option>
+                  <option>Successful only</option>
+                  <option>Failed only</option>
+                </select>
+              </div>
+              <div class="select-wrap select-wrap--sm">
+                <select class="input input--select input--sm">
+                  <option>Last 24 hours</option>
+                  <option>Last 7 days</option>
+                  <option>Last 30 days</option>
+                </select>
+              </div>
+            </div>
+            <div class="logs-toolbar__right">
+              <span class="muted">Showing last 100 requests</span>
+              <button class="btn btn--ghost btn--sm" data-action="simulate-log">⚡ Simulate Request</button>
+            </div>
+          </div>
+          <div class="logs-list" id="logsList">
+            <div class="logs-empty">
+              <div class="logs-empty__icon">📊</div>
+              <h3>No requests yet</h3>
+              <p>Once your webhook starts receiving requests, they'll appear here.</p>
+              <button class="btn btn--ghost" data-action="simulate-log">⚡ Simulate a test request</button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <!-- ====== Delete confirmation modal ====== -->
+    <div class="modal" id="deleteModal" hidden>
+      <div class="modal__backdrop" data-action="close-modal"></div>
+      <div class="modal__dialog">
+        <h3 class="modal__title">Delete this webhook?</h3>
+        <p class="modal__text">This will permanently delete <strong id="deleteModalName">the webhook</strong>. External tools sending to this URL will start receiving <code>404 Not Found</code>.</p>
+        <div class="modal__actions">
+          <button class="btn btn--ghost" data-action="close-modal">Keep webhook</button>
+          <button class="btn btn--danger" data-action="confirm-delete">Delete webhook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Card action menu popover ====== -->
+    <div class="popover" id="cardPopover" hidden>
+      <button class="popover__item" data-action="popover-edit">✏️ Edit</button>
+      <button class="popover__item" data-action="popover-toggle">⏸ Disable</button>
+      <button class="popover__item" data-action="popover-copy">📋 Copy URL</button>
+      <div class="popover__divider"></div>
+      <button class="popover__item popover__item--danger" data-action="popover-delete">🗑 Delete</button>
+    </div>
+
+    <!-- ====== Toast container ====== -->
+    <div class="toasts" id="toasts"></div>
+
+    <!-- ====== Guide overlay (first-time coach marks) ====== -->
+    <div class="guide" id="guide" hidden>
+      <div class="guide__content">
+        <h4 class="guide__title" id="guideTitle">Step 1 of 6</h4>
+        <p class="guide__text" id="guideText">Welcome! Click "Add Your First Webhook" to begin.</p>
+        <div class="guide__actions">
+          <button class="btn btn--ghost btn--sm" data-action="guide-skip">Skip tour</button>
+          <button class="btn btn--primary btn--sm" data-action="guide-next" id="guideNextBtn">Got it</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="incoming-webhooks.js"></script>
+</body>
+</html>
