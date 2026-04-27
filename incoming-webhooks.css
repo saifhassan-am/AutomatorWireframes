@@ -379,6 +379,26 @@ html, body {
 }
 .edit-title-row__input { flex: 1; }
 
+/* "Toggle only" header — used in the new layout where the Name input has
+   been moved into Setup Step 1. The header now just shows a static title +
+   subtitle on the left and the Enabled toggle on the right. */
+.edit-title-row--toggle-only {
+  align-items: center;
+}
+.edit-title-row__heading { flex: 1; min-width: 0; }
+.edit-title-row__title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  color: var(--text);
+}
+.edit-title-row__sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 /* ====== Form controls ====== */
 .field-label {
   display: block;
@@ -1640,6 +1660,203 @@ html, body {
   justify-content: flex-end;
 }
 
+/* ==========================================================
+   Connection card (Setup Step 2)
+   — Holds the Webhook URL + Signing Secret. Always visible.
+   ========================================================== */
+.connection-card {
+  padding: 18px 20px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.connection-card__title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.connection-card__hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ==========================================================
+   Advanced security disclosure
+   — Mirrors the "+ Add a delay" / "+ Add a condition" pattern
+     from form-thrive-action.html. Subtle weight by design —
+     for the 5% of users who don't want defaults.
+   ========================================================== */
+.advanced-sec {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.advanced-sec__collapsed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.advanced-sec__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.advanced-sec__expanded {
+  animation: fadeIn .2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .advanced-sec__expanded { animation: none; }
+}
+.advanced-sec__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.advanced-sec__head-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.advanced-sec__divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 18px 0;
+}
+
+/* ==========================================================
+   Test section divider + inline test block
+   — Test now lives inside Setup Step 2, separated from the
+     advanced-sec disclosure by a divider.
+   ========================================================== */
+.setup-step__divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0 20px;
+}
+.test-section { }
+.test-section__title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.test-section__sub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+/* Inline variant of the test block used inside Setup Step 2 — softer
+   chrome than the legacy focal version since it's already nested in
+   a step container. */
+.test-block--inline {
+  padding: 28px 20px 22px;
+  background: linear-gradient(180deg, #fff9f2 0%, #ffffff 65%);
+  border: 1px dashed var(--brand-light);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+/* ==========================================================
+   Text links (subtle secondary actions) — borrowed from
+   form-thrive-action.css for the advanced-sec disclosure.
+   ========================================================== */
+.text-link {
+  background: transparent;
+  border: none;
+  color: var(--brand);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 2px;
+  transition: color .15s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.text-link:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+.text-link--primary { color: var(--brand); }
+.text-link--muted   { color: var(--text-muted); }
+.text-link--muted:hover { color: var(--text); text-decoration: underline; }
+
+/* ==========================================================
+   Spotlight overlay (matches form-thrive-action pattern)
+   ========================================================== */
+.spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  pointer-events: none;
+}
+.spotlight[hidden] { display: none; }
+.spotlight--backdrop-only {
+  background: rgba(0, 0, 0, 0.35);
+  animation: fadeIn .2s ease;
+}
+.spotlight__hole {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  transition: top .25s ease, left .25s ease, width .25s ease, height .25s ease;
+  pointer-events: none;
+  opacity: 0;
+}
+.spotlight--active .spotlight__hole { opacity: 1; }
+.spotlight--backdrop-only .spotlight__hole { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .spotlight__hole { transition: none; }
+}
+
+/* ==========================================================
+   Guide progress dots (matches form-thrive-action)
+   ========================================================== */
+.guide__progress {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 14px;
+  align-items: center;
+}
+.guide__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.35);
+  transition: all .2s ease;
+}
+.guide__dot--done {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.guide__dot--current {
+  background: #fff;
+  border-color: #fff;
+  transform: scale(1.25);
+}
+
+/* Reduced-motion: kill the CTA pulse for users who request it. */
+@media (prefers-reduced-motion: reduce) {
+  .btn--pulse { animation: none; }
+  .pulse-ring { animation: none; opacity: 0; }
+}
+
 /* ====== Responsive ====== */
 @media (max-width: 720px) {
   .app { padding: 16px 12px 60px; }
@@ -1669,4 +1886,10 @@ html, body {
   .setup-step:not(:last-child)::before { left: 13px; top: 34px; }
   .setup-step--focal .setup-step__body { padding: 28px 16px 22px; }
   .btn--xl { padding: 12px 20px; font-size: 14px; width: 100%; }
+
+  /* Connection card + advanced-sec on mobile */
+  .connection-card { padding: 14px 14px 16px; }
+  .input-group { flex-wrap: wrap; }
+  .test-block--inline { padding: 22px 14px 18px; }
+  .edit-title-row--toggle-only { align-items: flex-start; }
 }

@@ -8,7 +8,7 @@
   // ─── State ───────────────────────────────────────────────
   const state = {
     view: 'empty',              // 'empty' | 'list' | 'edit'
-    tab: 'setup',               // 'setup' | 'mapping' | 'security' | 'logs'
+    tab: 'setup',               // 'setup' | 'mapping' | 'logs'
     testState: 'idle',          // 'idle' | 'listening' | 'captured'
     webhooks: [],               // list of saved webhooks
     activeId: null,             // id of webhook being edited
@@ -20,6 +20,7 @@
     advancedMode: false,        // show the advanced 2-column mapping UI
     showMoreFields: false,      // show optional fields in smart view
     editingField: null,         // currently being edited via inline dropdown
+    advancedSecOpen: false,     // is the advanced security disclosure expanded
     countdownInterval: null,
     listenTimeoutId: null,
     logs: {},                   // { webhookId: [{...logEntry}] }
@@ -61,13 +62,35 @@
     { key: 'product_override', label: 'Product Override', required: false, autoMap: null },
   ];
 
+  // 5-step coach-mark tour. Mirrors form-thrive-action.html: each step has a
+  // `target` selector for the spotlight overlay. Steps that span the whole
+  // screen (welcome, finish) leave target = null → backdrop-only dim.
   const GUIDE_STEPS = [
-    { title: 'Welcome! 👋', text: 'This is an interactive prototype of the new Incoming Webhooks feature for Thrive Apprentice. Click "Add Your First Webhook" to begin.' },
-    { title: 'Name your webhook', text: 'Give it a descriptive name so you remember which external tool it\'s for. Try "ThriveCart — Photography Masterclass".' },
-    { title: 'Choose the action', text: 'Pick what happens when data arrives. For new purchases, "Find or Create User, Then Grant Access" is ideal.' },
-    { title: 'Listen for a test', text: 'Click the big "Listen for Test Request" button — it\'s the only one you need right now. In the demo, use "Simulate Incoming" to see a payload arrive.' },
-    { title: 'Review auto-matched fields', text: 'We automatically matched email, first name, and last name. Review them below, then click "Continue to Security →" to move on.' },
-    { title: 'Save & activate', text: 'Review the security settings, then click "Save & Activate Webhook" — the single button at the bottom. Your webhook is now live.' },
+    {
+      title: 'Welcome',
+      text: 'This is the new <strong>Incoming Webhooks</strong> screen. Click "Add Your First Webhook" to begin — we\'ll walk you through it.',
+      target: '[data-action="create-webhook"]',
+    },
+    {
+      title: 'Tell us what should happen',
+      text: 'Step 1 — name this webhook, pick the action, and choose the product it applies to. The Name lives here now (no more typing it before you know what you\'re building).',
+      target: '.setup-step[data-step="1"]',
+    },
+    {
+      title: 'Connect your external tool',
+      text: 'Step 2 — paste the <strong>URL</strong> and <strong>signing secret</strong> into ThriveCart, Stripe, or whichever tool will send you webhooks. Defaults are sensible; advanced settings are tucked away below.',
+      target: '.connection-card',
+    },
+    {
+      title: 'Send a test request',
+      text: 'Click the big "Listen for Test Request" button. In this demo, "⚡ Simulate Incoming" pretends a real request arrived so you can see the capture flow.',
+      target: '[data-action="start-listening"]',
+    },
+    {
+      title: 'Review fields & save',
+      text: 'After the payload is captured, we auto-match fields like email and name. Review them on the Field Mapping tab, then hit <strong>Save &amp; Activate Webhook</strong> — your webhook is live.',
+      target: null,
+    },
   ];
 
   // ─── DOM helpers ─────────────────────────────────────────
@@ -129,6 +152,9 @@
       ? (state.draft?.name || state.webhooks.find(w => w.id === state.activeId)?.name || 'New Webhook')
       : 'Incoming Webhooks';
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (state.guide.active) {
+      requestAnimationFrame(repositionSpotlight);
+    }
   }
 
   function setTab(tab) {
@@ -138,6 +164,10 @@
 
     if (tab === 'mapping') renderMappingTab();
     if (tab === 'logs') renderLogsTab();
+
+    if (state.guide.active) {
+      requestAnimationFrame(repositionSpotlight);
+    }
   }
 
   function setTestState(testState) {
@@ -218,7 +248,7 @@
       productId: '',
       createUser: true,
       mappings: {},
-      security: { mode: 'shared', secret: generateSecret() },
+      security: { mode: 'shared', secret: generateSecret(), headerName: 'X-Webhook-Secret' },
       isNew: true,
     };
     state.activeId = id;
@@ -229,6 +259,7 @@
     state.advancedMode = false;
     state.showMoreFields = false;
     state.editingField = null;
+    state.advancedSecOpen = false;
 
     populateEditForm(state.draft);
     setTab('setup');
@@ -249,6 +280,7 @@
     state.showMoreFields = false;
     state.editingField = null;
     state.selectedPayloadKey = null;
+    state.advancedSecOpen = false;
 
     populateEditForm(state.draft);
     setTab('setup');
@@ -267,10 +299,29 @@
     $('#createUser').checked = !!wh.createUser;
     $('#secretValue').value = wh.security?.secret || generateSecret();
     $('#secretValue').type = 'password';
+    const headerInput = $('#secretHeaderName');
+    if (headerInput) headerInput.value = wh.security?.headerName || 'X-Webhook-Secret';
+
+    // Reset advanced-sec disclosure to collapsed
+    closeAdvancedSec();
+
+    // Reset reveal button label
+    const toggleBtn = document.querySelector('[data-action="toggle-secret"]');
+    if (toggleBtn) toggleBtn.textContent = '👁 Reveal';
+
+    // Update title row display
+    updateTitleDisplay();
 
     toggleCreateUserBlock();
     toggleMappingBadge();
     updateLogCount();
+  }
+
+  function updateTitleDisplay() {
+    const display = $('#editTitleDisplay');
+    if (!display) return;
+    const name = ($('#webhookName')?.value || '').trim();
+    display.textContent = name || 'New Webhook';
   }
 
   function toggleCreateUserBlock() {
@@ -280,17 +331,11 @@
   }
 
   function updateSaveButton() {
-    // Intentional no-op.
-    //
-    // Previously this disabled the "Save & Activate Webhook" button on the
-    // Security tab whenever Name or Product was missing. Problem: Product
-    // lives on the SETUP tab, so a user on Security couldn't see *why* the
-    // button was disabled, couldn't fix it from there, and got stuck.
-    //
-    // We now keep the button always clickable. Validation happens on click
-    // inside saveWebhook() — which produces a clear error toast and jumps
-    // the user back to Setup with focus on the missing field. ADHD-friendly:
-    // clicks always produce a clear outcome, never silent failure.
+    // Intentional no-op (kept for backwards compatibility with existing
+    // callers). The "Save & Activate Webhook" button now lives on the
+    // Field Mapping tab and is always clickable. Validation happens on
+    // click inside saveWebhook() — which produces a clear error toast and
+    // jumps the user back to Setup with focus on the missing field.
   }
 
   function syncDraftFromForm() {
@@ -303,7 +348,14 @@
     state.draft.mappings = state.mappings;
     state.draft.autoMatched = state.autoMatched;
     state.draft.capturedPayload = state.capturedPayload;
-    state.draft.security = { mode: 'shared', secret: $('#secretValue').value };
+    const checkedRadio = document.querySelector('input[name="sec"]:checked');
+    const mode = checkedRadio ? checkedRadio.value : 'shared';
+    const headerInput = $('#secretHeaderName');
+    state.draft.security = {
+      mode,
+      secret: $('#secretValue').value,
+      headerName: headerInput ? headerInput.value : 'X-Webhook-Secret',
+    };
   }
 
   function saveWebhook() {
@@ -322,7 +374,6 @@
         4500
       );
       setTab('setup');
-      // Give the tab switch a frame to render, then focus + scroll to the field
       setTimeout(() => {
         const target = !state.draft.name ? $('#webhookName') : $('#productId');
         if (target) {
@@ -349,13 +400,12 @@
     } else {
       state.webhooks.unshift(saveable);
       toast('Webhook saved and is now live', 'success');
-      // Auto-seed a couple of log entries for demo realism
       setTimeout(() => simulateLog(saveable.id, true), 1200);
     }
 
     state.draft = null;
     renderList();
-    maybeGuideNext();
+    maybeGuideNext('save-webhook');
   }
 
   // ─── Listening / capture flow ────────────────────────────
@@ -375,10 +425,11 @@
       }
     }, 1000);
 
-    // Auto-simulate a capture after 8 seconds so impatient demo users still see it
     state.listenTimeoutId = setTimeout(() => {
       if (state.testState === 'listening') simulatePayloadCapture();
     }, 8000);
+
+    maybeGuideNext('start-listening');
   }
 
   function cancelListening() {
@@ -394,8 +445,6 @@
     clearTimeout(state.listenTimeoutId);
     state.capturedPayload = JSON.parse(JSON.stringify(SAMPLE_PAYLOAD));
 
-    // Smart auto-match runs immediately so when the user arrives on the
-    // mapping tab everything is already filled in
     autoMatchFields();
 
     setTestState('captured');
@@ -408,7 +457,7 @@
     }
 
     toggleMappingBadge();
-    maybeGuideNext();
+    maybeGuideNext('payload-captured');
   }
 
   // ─── Field mapping ───────────────────────────────────────
@@ -420,7 +469,6 @@
     $('#mappingBadge').hidden = !hasPayload || hasAllRequired;
   }
 
-  // Recursively find the best-matching path in the payload
   function findBestMatch(payload, patterns) {
     const candidates = [];
     function walk(obj, path = '') {
@@ -432,7 +480,6 @@
         } else if (value != null) {
           for (let i = 0; i < patterns.length; i++) {
             if (patterns[i].test(key)) {
-              // score: earlier pattern = better match, shallower path = better
               candidates.push({
                 path: fullPath,
                 value: String(value),
@@ -448,7 +495,6 @@
     return candidates.sort((a, b) => b.score - a.score)[0] || null;
   }
 
-  // Flatten payload into selectable paths (for inline dropdowns)
   function getAllPayloadPaths(obj, path = '') {
     const paths = [];
     if (!obj || typeof obj !== 'object') return paths;
@@ -463,12 +509,10 @@
     return paths;
   }
 
-  // Look up a value by dot-notation path
   function getValueByPath(obj, path) {
     return path.split('.').reduce((acc, k) => (acc != null ? acc[k] : undefined), obj);
   }
 
-  // Run smart auto-match after payload is captured
   function autoMatchFields() {
     state.autoMatched = {};
     state.mappings = {};
@@ -494,7 +538,6 @@
     empty.hidden = true;
     content.hidden = false;
 
-    // Show the detected-email banner only when email was auto-matched
     const emailAutoMatched = state.autoMatched.email && state.mappings.email;
     const banner = $('#detectBanner');
     if (emailAutoMatched) {
@@ -514,12 +557,9 @@
       $('#advancedView').hidden = true;
       renderSmartMatch();
     }
-
-    updateSaveMappingButton();
   }
 
   function renderSmartMatch() {
-    // Title — count of matched primary fields
     const matchedCount = PRIMARY_FIELDS.filter(f => state.mappings[f]).length;
     const titleEl = $('#smartMatchTitle');
     if (matchedCount === PRIMARY_FIELDS.length) {
@@ -530,14 +570,12 @@
       titleEl.innerHTML = `We couldn't auto-match — choose fields manually`;
     }
 
-    // Primary fields (always visible)
     const primaryContainer = $('#smartFields');
     primaryContainer.innerHTML = '';
     PRIMARY_FIELDS.forEach(fieldKey => {
       primaryContainer.appendChild(buildSmartFieldRow(fieldKey));
     });
 
-    // "Add more fields" button + content
     const available = SECONDARY_FIELDS.filter(f => !state.mappings[f]);
     const added = SECONDARY_FIELDS.filter(f => state.mappings[f]);
     const moreContainer = $('#moreFields');
@@ -577,7 +615,6 @@
       class: `smart-field ${mapped ? 'smart-field--matched' : 'smart-field--unmapped'} ${isEditing ? 'smart-field--editing' : ''}`,
     });
 
-    // Label
     const labelRow = el('div', { class: 'smart-field__label' });
     labelRow.innerHTML = `
       <span class="smart-field__name">${field.label}</span>
@@ -591,7 +628,6 @@
     row.appendChild(labelRow);
 
     if (isEditing) {
-      // Inline dropdown editor
       const pickerWrap = el('div', { class: 'smart-field__picker' });
       const paths = getAllPayloadPaths(state.capturedPayload);
       let options = '<option value="">— Not mapped —</option>';
@@ -611,7 +647,6 @@
       `;
       row.appendChild(pickerWrap);
     } else if (mapped) {
-      // Matched display
       const match = el('div', { class: 'smart-field__match' });
       const valuePreview = matchedValue == null ? '—' : String(matchedValue);
       match.innerHTML = `
@@ -630,7 +665,6 @@
       `;
       row.appendChild(actions);
     } else {
-      // Unmapped — show "Choose field" button
       const unmapped = el('div', { class: 'smart-field__match smart-field__match--empty' });
       unmapped.innerHTML = `
         <span class="smart-field__placeholder">Not mapped</span>
@@ -659,7 +693,7 @@
     const newValue = select.value;
     if (newValue) {
       state.mappings[fieldKey] = newValue;
-      state.autoMatched[fieldKey] = false; // user picked manually
+      state.autoMatched[fieldKey] = false;
     } else {
       delete state.mappings[fieldKey];
       delete state.autoMatched[fieldKey];
@@ -667,7 +701,6 @@
     state.editingField = null;
     renderSmartMatch();
     toggleMappingBadge();
-    updateSaveMappingButton();
   }
 
   function removeField(fieldKey) {
@@ -675,7 +708,6 @@
     delete state.autoMatched[fieldKey];
     renderSmartMatch();
     toggleMappingBadge();
-    updateSaveMappingButton();
   }
 
   function cancelEditField() {
@@ -711,8 +743,6 @@
 
           const children = el('div', { class: 'json-children' });
           tree.appendChild(children);
-          const origTree = tree;
-          // Temporarily swap insertion target
           const prevAppend = tree.appendChild.bind(tree);
           tree.appendChild = n => children.appendChild(n);
           renderNode(value, fullPath);
@@ -803,30 +833,7 @@
     toggleMappingBadge();
   }
 
-  function autoMapFields() {
-    APPRENTICE_FIELDS.forEach(f => {
-      if (f.autoMap) state.mappings[f.key] = f.autoMap;
-    });
-    renderMappingTab();
-    toggleMappingBadge();
-    toast('Fields auto-mapped based on matching names', 'success');
-    maybeGuideNext();
-  }
-
-  function updateSaveMappingButton() {
-    const hasAllRequired = APPRENTICE_FIELDS
-      .filter(f => f.required)
-      .every(f => state.mappings[f.key]);
-    $('#saveMappingBtn').disabled = !hasAllRequired;
-  }
-
-  function saveMapping() {
-    syncDraftFromForm();
-    toast('Fields saved. One last step — review security.', 'success');
-    setTab('security');
-  }
-
-  // ─── Security tab ────────────────────────────────────────
+  // ─── Security tab functions (now embedded in advanced-sec) ──
   function toggleSecret() {
     const input = $('#secretValue');
     const button = document.querySelector('[data-action="toggle-secret"]');
@@ -842,8 +849,18 @@
   function regenSecret() {
     $('#secretValue').value = generateSecret();
     $('#secretValue').type = 'text';
-    document.querySelector('[data-action="toggle-secret"]').textContent = '🙈 Hide';
+    const toggleBtn = document.querySelector('[data-action="toggle-secret"]');
+    if (toggleBtn) toggleBtn.textContent = '🙈 Hide';
+    if (state.draft) {
+      state.draft.security = state.draft.security || {};
+      state.draft.security.secret = $('#secretValue').value;
+    }
+    // Slightly longer warn-styled toast — the user *must* update their sender.
     toast('New secret generated. Update your sender!', 'warn', 4000);
+  }
+
+  function copySecret() {
+    copyToClipboard($('#secretValue').value, 'Signing secret copied');
   }
 
   function handleSecurityRadioChange() {
@@ -853,6 +870,21 @@
       const extras = opt.querySelector('.radio-option__extras');
       if (extras) extras.hidden = !radio.checked;
     });
+  }
+
+  // ─── Advanced security disclosure (Setup Step 2) ──────────
+  function openAdvancedSec() {
+    state.advancedSecOpen = true;
+    $('#advancedSecCollapsed').hidden = true;
+    $('#advancedSecExpanded').hidden = false;
+    if (state.guide.active) requestAnimationFrame(repositionSpotlight);
+  }
+  function closeAdvancedSec() {
+    state.advancedSecOpen = false;
+    const collapsed = $('#advancedSecCollapsed');
+    const expanded = $('#advancedSecExpanded');
+    if (collapsed) collapsed.hidden = false;
+    if (expanded) expanded.hidden = true;
   }
 
   // ─── Logs ────────────────────────────────────────────────
@@ -931,7 +963,6 @@
     state.logs[id] = state.logs[id] || [];
     state.logs[id].unshift(log);
 
-    // Age old logs
     state.logs[id].forEach((l, i) => {
       if (i === 0) l.relativeTime = 'just now';
       else if (i === 1) l.relativeTime = '2 min ago';
@@ -992,23 +1023,87 @@
     const g = $('#guide');
     const s = GUIDE_STEPS[step];
     $('#guideTitle').textContent = `${s.title} · Step ${step + 1} of ${GUIDE_STEPS.length}`;
-    $('#guideText').textContent = s.text;
+    $('#guideText').innerHTML = s.text; // safe HTML allowed (e.g. <strong>)
     $('#guideNextBtn').textContent = step === GUIDE_STEPS.length - 1 ? 'Finish' : 'Got it';
     g.hidden = false;
     state.guide = { step, active: true };
+    renderGuideProgress(step);
+    updateSpotlight(s.target);
   }
   function hideGuide() {
     $('#guide').hidden = true;
     state.guide.active = false;
-  }
-  function maybeGuideNext() {
-    if (!state.guide.active) return;
-    // Only advance on specific key moments, handled from callers
+    hideSpotlight();
   }
   function advanceGuide() {
     const next = state.guide.step + 1;
     if (next >= GUIDE_STEPS.length) hideGuide();
     else showGuide(next);
+  }
+  function maybeGuideNext(trigger) {
+    if (!state.guide.active) return;
+    // Auto-advance at meaningful moments. Each step listens for ONE
+    // specific event so the tour never feels racy.
+    if (trigger === 'create-webhook'    && state.guide.step === 0) advanceGuide();
+    if (trigger === 'fill-step-1'       && state.guide.step === 1) advanceGuide();
+    if (trigger === 'start-listening'   && state.guide.step === 3) advanceGuide();
+    if (trigger === 'payload-captured'  && state.guide.step === 3) advanceGuide();
+    if (trigger === 'save-webhook'      && state.guide.step === 4) hideGuide();
+  }
+
+  function renderGuideProgress(step) {
+    const dots = $$('#guideProgress .guide__dot');
+    dots.forEach((dot, i) => {
+      dot.classList.remove('guide__dot--current', 'guide__dot--done');
+      if (i < step) dot.classList.add('guide__dot--done');
+      else if (i === step) dot.classList.add('guide__dot--current');
+    });
+  }
+
+  // Spotlight overlay — darkens the page except for the current target.
+  // Borrowed wholesale from form-thrive-action.js.
+  function updateSpotlight(targetSelector) {
+    const spotlight = $('#spotlight');
+    const hole = $('#spotlightHole');
+    if (!spotlight || !hole) return;
+
+    if (!targetSelector) {
+      spotlight.hidden = false;
+      spotlight.classList.add('spotlight--backdrop-only');
+      spotlight.classList.remove('spotlight--active');
+      return;
+    }
+
+    const target = document.querySelector(targetSelector);
+    if (!target || target.offsetParent === null) {
+      spotlight.hidden = false;
+      spotlight.classList.add('spotlight--backdrop-only');
+      spotlight.classList.remove('spotlight--active');
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const padding = 8;
+    spotlight.hidden = false;
+    spotlight.classList.remove('spotlight--backdrop-only');
+    spotlight.classList.add('spotlight--active');
+    hole.style.top    = `${Math.max(0, rect.top - padding)}px`;
+    hole.style.left   = `${Math.max(0, rect.left - padding)}px`;
+    hole.style.width  = `${rect.width + padding * 2}px`;
+    hole.style.height = `${rect.height + padding * 2}px`;
+  }
+
+  function hideSpotlight() {
+    const spotlight = $('#spotlight');
+    if (!spotlight) return;
+    spotlight.hidden = true;
+    spotlight.classList.remove('spotlight--active', 'spotlight--backdrop-only');
+  }
+
+  function repositionSpotlight() {
+    if (!state.guide.active) return;
+    const step = GUIDE_STEPS[state.guide.step];
+    if (step) updateSpotlight(step.target);
   }
 
   // ─── Reset ───────────────────────────────────────────────
@@ -1038,17 +1133,16 @@
       const action = target.dataset.action;
 
       switch (action) {
-        case 'create-webhook':        createDraft(); break;
+        case 'create-webhook':        createDraft(); maybeGuideNext('create-webhook'); break;
         case 'back-to-list':          state.draft = null; renderList(); break;
         case 'copy-url':              copyToClipboard($('#webhookUrl').value, 'Webhook URL copied'); break;
+        case 'copy-secret':           copySecret(); break;
         case 'start-listening':       startListening(); break;
         case 'cancel-listening':      cancelListening(); break;
         case 'simulate-payload':      simulatePayloadCapture(); break;
         case 'paste-sample':          simulatePayloadCapture(); toast('Sample payload pasted', 'info'); break;
         case 'go-mapping':            setTab('mapping'); break;
         case 'go-setup':              setTab('setup'); break;
-        case 'auto-map':              autoMapFields(); break;
-        case 'save-mapping':          saveMapping(); break;
         case 'smart-change':          startEditField(target.dataset.field); break;
         case 'smart-save-edit':       saveEditField(target.dataset.field); break;
         case 'smart-cancel-edit':     cancelEditField(); break;
@@ -1059,6 +1153,8 @@
         case 'save-webhook':          saveWebhook(); break;
         case 'toggle-secret':         toggleSecret(); break;
         case 'regen-secret':          regenSecret(); break;
+        case 'open-advanced-sec':     openAdvancedSec(); break;
+        case 'close-advanced-sec':    closeAdvancedSec(); break;
         case 'simulate-log':          simulateLog(); break;
         case 'close-modal':           closeDeleteModal(); break;
         case 'confirm-delete':        confirmDelete(); break;
@@ -1096,15 +1192,14 @@
     // Tab clicks
     $$('.tab').forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
 
-    // Form listeners
+    // Form listeners — guide advance on Step 1 fill (name + product both set)
     $('#webhookName').addEventListener('input', () => {
-      updateSaveButton();
+      updateTitleDisplay();
       $('#crumbActive').textContent = $('#webhookName').value || 'New Webhook';
-      if (state.guide.active && state.guide.step === 1 && $('#webhookName').value.length > 3) advanceGuide();
+      checkStep1Complete();
     });
     $('#productId').addEventListener('change', () => {
-      updateSaveButton();
-      if (state.guide.active && state.guide.step === 2) advanceGuide();
+      checkStep1Complete();
     });
     $('#actionType').addEventListener('change', toggleCreateUserBlock);
     $('#createUser').addEventListener('change', toggleCreateUserBlock);
@@ -1126,7 +1221,11 @@
     // Reset
     $('#resetBtn').addEventListener('click', resetAll);
 
-    // Escape key → close modal, cancel listening
+    // Reposition spotlight on scroll/resize while guide is active
+    window.addEventListener('scroll', repositionSpotlight, { passive: true });
+    window.addEventListener('resize', repositionSpotlight);
+
+    // Escape key → close modal, cancel listening, or hide guide
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (!$('#deleteModal').hidden) closeDeleteModal();
@@ -1134,15 +1233,15 @@
         else if (!$('#guide').hidden) hideGuide();
       }
     });
+  }
 
-    // Kick off guide for specific clicks
-    document.addEventListener('click', (e) => {
-      if (!state.guide.active) return;
-      if (state.guide.step === 0 && e.target.closest('[data-action="create-webhook"]')) advanceGuide();
-      if (state.guide.step === 3 && e.target.closest('[data-action="simulate-payload"]')) {} // handled by simulatePayloadCapture
-      if (state.guide.step === 4 && e.target.closest('[data-action="save-mapping"]')) advanceGuide();
-      if (state.guide.step === 5 && e.target.closest('[data-action="save-webhook"]')) advanceGuide();
-    }, true);
+  // Tour helper: advance from Step 1 once both name and product are set.
+  function checkStep1Complete() {
+    if (!state.guide.active) return;
+    if (state.guide.step !== 1) return;
+    const nameOk = ($('#webhookName').value || '').trim().length > 2;
+    const productOk = !!$('#productId').value;
+    if (nameOk && productOk) maybeGuideNext('fill-step-1');
   }
 
   function copyToClipboard(text, successMessage) {
@@ -1163,7 +1262,6 @@
   function init() {
     wireEvents();
     renderList();
-    // Fresh load → show guide after a tick
     setTimeout(() => showGuide(0), 400);
   }
 
