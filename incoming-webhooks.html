@@ -221,6 +221,10 @@
                 <div class="setup-step__body">
 
                   <!-- ─── Connection card ─── -->
+                  <!-- Three copyable fields: URL (where to send), Header name
+                       (which header to send the secret in), and Signing secret
+                       (the value). Surfacing the header name here means users
+                       don't have to open Advanced to learn what header to use. -->
                   <div class="connection-card">
                     <h4 class="connection-card__title">Connection details for your external tool</h4>
 
@@ -230,7 +234,13 @@
                       <button class="btn btn--ghost btn--icon" data-action="copy-url">📋 Copy</button>
                     </div>
 
-                    <label class="field-label field-label--spaced" for="secretValue">Signing secret</label>
+                    <label class="field-label field-label--spaced" for="webhookHeaderName">Header name</label>
+                    <div class="input-group">
+                      <input type="text" class="input input--mono" id="webhookHeaderName" readonly value="X-Webhook-Secret">
+                      <button class="btn btn--ghost btn--icon" data-action="copy-header-name">📋 Copy</button>
+                    </div>
+
+                    <label class="field-label field-label--spaced" for="secretValue">Signing secret <span class="field-label__sub">(value for the header above)</span></label>
                     <div class="input-group">
                       <input type="password" class="input input--mono" id="secretValue" value="">
                       <button class="btn btn--ghost btn--icon" data-action="toggle-secret">👁 Reveal</button>
@@ -239,7 +249,7 @@
                     </div>
 
                     <p class="connection-card__hint">
-                      Paste both into your external tool — the URL into the webhook URL field, the secret into the header / secret field next to it.
+                      In your external tool: paste the <strong>URL</strong> into the webhook URL field, then add a custom header with the <strong>Header name</strong> and <strong>Signing secret</strong> above as the name/value pair.
                     </p>
                   </div>
 

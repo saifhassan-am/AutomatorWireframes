@@ -299,8 +299,11 @@
     $('#createUser').checked = !!wh.createUser;
     $('#secretValue').value = wh.security?.secret || generateSecret();
     $('#secretValue').type = 'password';
-    const headerInput = $('#secretHeaderName');
-    if (headerInput) headerInput.value = wh.security?.headerName || 'X-Webhook-Secret';
+    const headerName = wh.security?.headerName || 'X-Webhook-Secret';
+    const headerInput = $('#secretHeaderName');           // editable, inside Advanced
+    if (headerInput) headerInput.value = headerName;
+    const headerDisplay = $('#webhookHeaderName');         // read-only, in Connection card
+    if (headerDisplay) headerDisplay.value = headerName;
 
     // Reset advanced-sec disclosure to collapsed
     closeAdvancedSec();
@@ -1137,6 +1140,7 @@
         case 'back-to-list':          state.draft = null; renderList(); break;
         case 'copy-url':              copyToClipboard($('#webhookUrl').value, 'Webhook URL copied'); break;
         case 'copy-secret':           copySecret(); break;
+        case 'copy-header-name':      copyToClipboard($('#webhookHeaderName').value, 'Header name copied'); break;
         case 'start-listening':       startListening(); break;
         case 'cancel-listening':      cancelListening(); break;
         case 'simulate-payload':      simulatePayloadCapture(); break;
@@ -1217,6 +1221,18 @@
 
     // Security radios
     $$('.radio-option input[type="radio"]').forEach(r => r.addEventListener('change', handleSecurityRadioChange));
+
+    // Mirror header-name changes from the editable Advanced input to the
+    // read-only display in the Connection card. The connection card shows
+    // the *current* header name even when Advanced is collapsed, so users
+    // know what header to set in their external tool without opening Advanced.
+    const editableHeader = $('#secretHeaderName');
+    if (editableHeader) {
+      editableHeader.addEventListener('input', () => {
+        const display = $('#webhookHeaderName');
+        if (display) display.value = editableHeader.value || 'X-Webhook-Secret';
+      });
+    }
 
     // Reset
     $('#resetBtn').addEventListener('click', resetAll);

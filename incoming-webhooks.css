@@ -410,6 +410,14 @@ html, body {
   margin-bottom: 6px;
 }
 .field-label--spaced { margin-top: 16px; }
+.field-label__sub {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-light);
+  margin-left: 6px;
+  font-size: 11px;
+}
 
 .input {
   width: 100%;
