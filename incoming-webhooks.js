@@ -21,6 +21,8 @@
     showMoreFields: false,      // show optional fields in smart view
     editingField: null,         // currently being edited via inline dropdown
     advancedSecOpen: false,     // is the advanced security disclosure expanded
+    setupStep1Expanded: true,   // is Setup Step 1 in expanded edit mode (vs collapsed summary)
+    setupStep2Revealed: false,  // is Setup Step 2 visible yet (revealed on Next click from Step 1)
     countdownInterval: null,
     listenTimeoutId: null,
     logs: {},                   // { webhookId: [{...logEntry}] }
@@ -73,12 +75,12 @@
     },
     {
       title: 'Tell us what should happen',
-      text: 'Step 1 — name this webhook, pick the action, and choose the product it applies to. The Name lives here now (no more typing it before you know what you\'re building).',
+      text: 'Step 1 — name this webhook, pick the action, and choose the product. When you\'re done, click <strong>Next: Webhook details →</strong> at the bottom to reveal Step 2.',
       target: '.setup-step[data-step="1"]',
     },
     {
       title: 'Connect your external tool',
-      text: 'Step 2 — paste the <strong>URL</strong> and <strong>signing secret</strong> into ThriveCart, Stripe, or whichever tool will send you webhooks. Defaults are sensible; advanced settings are tucked away below.',
+      text: 'Step 2 — paste the <strong>URL</strong>, <strong>Header name</strong>, and <strong>Signing secret</strong> into ThriveCart, Stripe, or whichever tool will send you webhooks. Advanced security settings are tucked away below.',
       target: '.connection-card',
     },
     {
@@ -260,11 +262,15 @@
     state.showMoreFields = false;
     state.editingField = null;
     state.advancedSecOpen = false;
+    // New webhook → start in Step 1 expanded, Step 2 hidden until "Next" clicked.
+    state.setupStep1Expanded = true;
+    state.setupStep2Revealed = false;
 
     populateEditForm(state.draft);
     setTab('setup');
     setTestState('idle');
     setView('edit');
+    renderSetupSteps();
     updateSaveButton();
   }
 
@@ -281,11 +287,15 @@
     state.editingField = null;
     state.selectedPayloadKey = null;
     state.advancedSecOpen = false;
+    // Existing webhook → Step 1 in summary mode, Step 2 fully visible.
+    state.setupStep1Expanded = false;
+    state.setupStep2Revealed = true;
 
     populateEditForm(state.draft);
     setTab('setup');
     setTestState(state.capturedPayload ? 'captured' : 'idle');
     setView('edit');
+    renderSetupSteps();
     updateSaveButton();
   }
 
@@ -325,6 +335,120 @@
     if (!display) return;
     const name = ($('#webhookName')?.value || '').trim();
     display.textContent = name || 'New Webhook';
+  }
+
+  // ─── Setup wizard: Step 1 ⇄ Step 2 progressive reveal ────
+  // Step 1 has two views (edit / summary) and Step 2 is hidden until the
+  // user clicks "Next: Webhook details →" on Step 1. This function syncs
+  // the DOM to whatever's in `state.setupStep1Expanded` /
+  // `state.setupStep2Revealed`. Called after createDraft / openEdit and
+  // after every advance / edit transition.
+  function renderSetupSteps() {
+    const step1Section = $('#setupStep1');
+    const editView     = $('#setupStep1Edit');
+    const summaryView  = $('#setupStep1Summary');
+    const doneLink     = $('#setupStep1DoneLink');
+    const step2        = $('#setupStep2');
+    if (!step1Section || !editView || !summaryView || !step2) return;
+
+    if (state.setupStep1Expanded) {
+      editView.hidden    = false;
+      summaryView.hidden = true;
+    } else {
+      editView.hidden    = true;
+      summaryView.hidden = false;
+      // Refresh the summary line each time we collapse Step 1.
+      const line = $('#setupStep1SummaryLine');
+      if (line) line.textContent = buildStep1Summary();
+    }
+
+    step2.hidden = !state.setupStep2Revealed;
+
+    // "Re-editing" state: user has already advanced past Step 1 (Step 2 is
+    // revealed) and clicked Edit to revise. Hide the Next-button footer
+    // (Step 2 is already open below) and show the small Done link instead.
+    const reEditing = state.setupStep1Expanded && state.setupStep2Revealed;
+    step1Section.classList.toggle('setup-step--re-editing', reEditing);
+    if (doneLink) doneLink.hidden = !reEditing;
+
+    // Reposition the spotlight in case the active guide step targets an
+    // element whose visibility just changed.
+    if (state.guide.active) {
+      requestAnimationFrame(repositionSpotlight);
+    }
+  }
+
+  // "Done" link in the expanded Step 1 (visible only when Step 2 is
+  // already revealed) — collapses Step 1 back to its summary view.
+  function collapseStep1ToSummary() {
+    state.setupStep1Expanded = false;
+    renderSetupSteps();
+    setTimeout(() => {
+      const summary = $('#setupStep1Summary');
+      if (summary) summary.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }
+
+  // One-line summary text shown in Step 1's collapsed view, e.g.
+  // "Find or Create User → Photography Masterclass".
+  function buildStep1Summary() {
+    const action = $('#actionType')?.value || 'find_create_grant';
+    const productId = $('#productId')?.value || '';
+    const actionLabel = actionLabels[action] || action;
+    const productName = productLabels[productId] || (productId ? productId : '(no product selected)');
+    return `${actionLabel} → ${productName}`;
+  }
+
+  // "Next: Webhook details →" click — validate Name + Product, then advance.
+  function advanceToStep2() {
+    const name = ($('#webhookName').value || '').trim();
+    const product = $('#productId').value;
+
+    const missing = [];
+    if (!name)    missing.push('a Name');
+    if (!product) missing.push('a Product');
+
+    if (missing.length > 0) {
+      toast(
+        `Almost there! Please add ${missing.join(' and ')} before continuing.`,
+        'error',
+        4000
+      );
+      // Focus the first missing field so the user can fix it immediately.
+      setTimeout(() => {
+        const target = !name ? $('#webhookName') : $('#productId');
+        if (target) {
+          target.focus();
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 60);
+      return;
+    }
+
+    state.setupStep1Expanded  = false;
+    state.setupStep2Revealed  = true;
+    renderSetupSteps();
+    // Smooth-scroll Step 2 into view so the user sees the connection card.
+    setTimeout(() => {
+      const step2 = $('#setupStep2');
+      if (step2) step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    maybeGuideNext('advance-to-step2');
+  }
+
+  // "Edit" link on Step 1 summary — re-expand Step 1. Step 2 stays revealed
+  // (the user wants to tweak Step 1 without losing visibility of what's
+  // below).
+  function editStep1() {
+    state.setupStep1Expanded = true;
+    renderSetupSteps();
+    setTimeout(() => {
+      const nameInput = $('#webhookName');
+      if (nameInput) {
+        nameInput.focus();
+        nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 80);
   }
 
   function toggleCreateUserBlock() {
@@ -377,6 +501,10 @@
         4500
       );
       setTab('setup');
+      // Expand Step 1 so the missing field is actually visible — if Step 1
+      // is in summary mode, the input we want to focus is in a hidden subtree.
+      state.setupStep1Expanded = true;
+      renderSetupSteps();
       setTimeout(() => {
         const target = !state.draft.name ? $('#webhookName') : $('#productId');
         if (target) {
@@ -1048,7 +1176,10 @@
     // Auto-advance at meaningful moments. Each step listens for ONE
     // specific event so the tour never feels racy.
     if (trigger === 'create-webhook'    && state.guide.step === 0) advanceGuide();
-    if (trigger === 'fill-step-1'       && state.guide.step === 1) advanceGuide();
+    // Step 1 advances when the user clicks "Next: Webhook details →" —
+    // not just when the fields are filled. Matches the wizard's intent:
+    // the user has explicitly committed to Step 1 before seeing Step 2.
+    if (trigger === 'advance-to-step2'  && state.guide.step === 1) advanceGuide();
     if (trigger === 'start-listening'   && state.guide.step === 3) advanceGuide();
     if (trigger === 'payload-captured'  && state.guide.step === 3) advanceGuide();
     if (trigger === 'save-webhook'      && state.guide.step === 4) hideGuide();
@@ -1118,6 +1249,8 @@
     state.capturedPayload = null;
     state.mappings = {};
     state.selectedPayloadKey = null;
+    state.setupStep1Expanded = true;
+    state.setupStep2Revealed = false;
     cancelListening();
     hideCardMenu();
     closeDeleteModal();
@@ -1141,6 +1274,9 @@
         case 'copy-url':              copyToClipboard($('#webhookUrl').value, 'Webhook URL copied'); break;
         case 'copy-secret':           copySecret(); break;
         case 'copy-header-name':      copyToClipboard($('#webhookHeaderName').value, 'Header name copied'); break;
+        case 'advance-to-step2':      advanceToStep2(); break;
+        case 'edit-step1':            editStep1(); break;
+        case 'collapse-step1':        collapseStep1ToSummary(); break;
         case 'start-listening':       startListening(); break;
         case 'cancel-listening':      cancelListening(); break;
         case 'simulate-payload':      simulatePayloadCapture(); break;

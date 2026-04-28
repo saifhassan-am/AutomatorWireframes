@@ -158,62 +158,101 @@
           <div class="setup-stepper">
 
             <!-- STEP 1 — What should happen? -->
-            <section class="setup-step" data-step="1">
-              <span class="setup-step__num" aria-hidden="true">1</span>
-              <div class="setup-step__content">
-                <h3 class="setup-step__title">What should happen?</h3>
-                <p class="setup-step__sub">Name this webhook, then pick the action and the product it applies to.</p>
-                <div class="setup-step__body">
+            <!-- Has two views: an expanded edit view (form fields) and a
+                 collapsed summary view (one-line readout + Edit). The
+                 expanded view is shown by default for new webhooks; on
+                 clicking "Next: Webhook details →", Step 1 collapses to
+                 the summary and Step 2 reveals below. -->
+            <section class="setup-step" data-step="1" id="setupStep1">
 
-                  <label class="field-label" for="webhookName">Webhook name</label>
-                  <input type="text" class="input" id="webhookName" placeholder="e.g., ThriveCart — Photography Masterclass">
+              <!-- Collapsed / summary view (hidden by default) -->
+              <div class="setup-step__summary" id="setupStep1Summary" hidden>
+                <span class="setup-step__num setup-step__num--done" aria-hidden="true">✓</span>
+                <div class="setup-step__summary-text">
+                  <h3 class="setup-step__summary-title">What should happen</h3>
+                  <p class="setup-step__summary-line" id="setupStep1SummaryLine">—</p>
+                </div>
+                <button class="text-link text-link--primary" data-action="edit-step1">Edit</button>
+              </div>
 
-                  <label class="field-label field-label--spaced" for="actionType">Action</label>
-                  <div class="select-wrap">
-                    <select class="input input--select" id="actionType">
-                      <option value="find_create_grant">Find or Create User, Then Grant Access</option>
-                      <option value="grant">Grant Access (user must already exist)</option>
-                      <option value="revoke">Revoke Access</option>
-                    </select>
-                  </div>
+              <!-- Expanded / edit view -->
+              <div class="setup-step__edit" id="setupStep1Edit">
+                <span class="setup-step__num" aria-hidden="true">1</span>
+                <div class="setup-step__content">
+                  <!-- Top-right Done link — only visible when Step 2 is
+                       already revealed (i.e. user clicked Edit on the
+                       summary to revise Step 1). Click collapses Step 1
+                       back to its success-message-only state. Hidden on
+                       first-time setup since the Next button is what
+                       advances the flow there. -->
+                  <button class="setup-step__done-link" id="setupStep1DoneLink" data-action="collapse-step1" hidden>
+                    Done
+                  </button>
+                  <h3 class="setup-step__title">What should happen?</h3>
+                  <p class="setup-step__sub">Name this webhook, then pick the action and the product it applies to.</p>
+                  <div class="setup-step__body">
 
-                  <label class="field-label field-label--spaced" for="productId">To this product</label>
-                  <div class="select-wrap">
-                    <select class="input input--select" id="productId">
-                      <option value="">— Select a product —</option>
-                      <option value="photo-master">Photography Masterclass</option>
-                      <option value="photo-advanced">Advanced Photography</option>
-                      <option value="portrait">Portrait Lighting</option>
-                    </select>
-                  </div>
+                    <label class="field-label" for="webhookName">Webhook name</label>
+                    <input type="text" class="input" id="webhookName" placeholder="e.g., ThriveCart — Photography Masterclass">
 
-                  <div class="checkbox-group" id="createUserWrap">
-                    <label class="check">
-                      <input type="checkbox" id="createUser" checked>
-                      <span class="check__label">If user doesn't exist, create a new account</span>
-                    </label>
-                  </div>
-
-                  <div class="nested-block" id="nestedBlock">
-                    <label class="field-label">Default role for new users</label>
+                    <label class="field-label field-label--spaced" for="actionType">Action</label>
                     <div class="select-wrap">
-                      <select class="input input--select input--sm">
-                        <option>Subscriber</option>
-                        <option>Customer</option>
-                        <option>Student</option>
+                      <select class="input input--select" id="actionType">
+                        <option value="find_create_grant">Find or Create User, Then Grant Access</option>
+                        <option value="grant">Grant Access (user must already exist)</option>
+                        <option value="revoke">Revoke Access</option>
                       </select>
                     </div>
-                    <label class="check">
-                      <input type="checkbox" checked>
-                      <span class="check__label">Send new account welcome email</span>
-                    </label>
+
+                    <label class="field-label field-label--spaced" for="productId">To this product</label>
+                    <div class="select-wrap">
+                      <select class="input input--select" id="productId">
+                        <option value="">— Select a product —</option>
+                        <option value="photo-master">Photography Masterclass</option>
+                        <option value="photo-advanced">Advanced Photography</option>
+                        <option value="portrait">Portrait Lighting</option>
+                      </select>
+                    </div>
+
+                    <div class="checkbox-group" id="createUserWrap">
+                      <label class="check">
+                        <input type="checkbox" id="createUser" checked>
+                        <span class="check__label">If user doesn't exist, create a new account</span>
+                      </label>
+                    </div>
+
+                    <div class="nested-block" id="nestedBlock">
+                      <label class="field-label">Default role for new users</label>
+                      <div class="select-wrap">
+                        <select class="input input--select input--sm">
+                          <option>Subscriber</option>
+                          <option>Customer</option>
+                          <option>Student</option>
+                        </select>
+                      </div>
+                      <label class="check">
+                        <input type="checkbox" checked>
+                        <span class="check__label">Send new account welcome email</span>
+                      </label>
+                    </div>
+
+                    <!-- Step 1 footer: advance to Step 2 -->
+                    <div class="setup-step__footer">
+                      <button class="btn btn--primary" id="advanceStep1Btn" data-action="advance-to-step2">
+                        Next: Webhook details →
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </section>
 
             <!-- STEP 2 — Webhook details (connection + security + test) -->
-            <section class="setup-step" data-step="2">
+            <!-- Hidden by default for new webhooks; revealed when the user
+                 clicks "Next: Webhook details →" on Step 1. For existing
+                 webhooks (re-opening the editor on a saved webhook), Step 2
+                 starts revealed and Step 1 starts in summary mode. -->
+            <section class="setup-step" data-step="2" id="setupStep2" hidden>
               <span class="setup-step__num" aria-hidden="true">2</span>
               <div class="setup-step__content">
                 <h3 class="setup-step__title">Webhook details</h3>
