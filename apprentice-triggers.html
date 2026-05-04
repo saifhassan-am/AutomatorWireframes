@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apprentice — Triggers</title>
+  <script src="auth.js"></script>
+  <link rel="stylesheet" href="apprentice-triggers.css">
+</head>
+<body>
+
+  <!-- ====== Admin chrome (matches incoming-webhooks) ====== -->
+  <header class="admin-bar">
+    <div class="admin-bar__inner">
+      <div class="admin-bar__brand">
+        <span class="admin-bar__logo">⌘</span>
+        <span>Thrive Apprentice</span>
+      </div>
+      <div class="admin-bar__user">
+        <span class="admin-bar__hint">Interactive prototype — no data is saved</span>
+        <button class="btn btn--ghost btn--sm" id="resetBtn" title="Start over">↻ Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app">
+
+    <div class="app__frame">
+
+      <!-- ====== Breadcrumb (always visible) ====== -->
+      <div class="crumb">
+        <span class="crumb__item">Thrive Apprentice</span>
+        <span class="crumb__sep">›</span>
+        <span class="crumb__item">Settings</span>
+        <span class="crumb__sep">›</span>
+        <span class="crumb__item crumb__item--active" id="crumbActive">Triggers</span>
+      </div>
+
+      <!-- ============================================= -->
+      <!-- VIEW: TRIGGERS LANDING                         -->
+      <!-- Four trigger cards — capability statements,    -->
+      <!-- not "no triggers configured yet". Each card    -->
+      <!-- counts active automations beneath it.          -->
+      <!-- ============================================= -->
+      <section class="view view--active" data-view="triggers-landing">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Triggers</h1>
+            <p class="page-subtitle">Wire native Thrive actions to Apprentice events. Tag students in your ESP, send webhooks, start countdowns, or unlock the next course — automatically.</p>
+          </div>
+        </div>
+
+        <div class="trigger-cards" id="triggerCards">
+          <!-- JS populates with four cards -->
+        </div>
+
+        <div class="landing-foot">
+          <p class="landing-foot__line">More trigger types coming — <strong>Quiz Pass / Fail</strong> and <strong>Assessment Status</strong> are sibling features under this same page.</p>
+        </div>
+      </section>
+
+      <!-- ============================================= -->
+      <!-- VIEW: TRIGGER DETAIL                           -->
+      <!-- Header (back link + name + description) +      -->
+      <!-- list of automation rows OR empty state.        -->
+      <!-- ============================================= -->
+      <section class="view" data-view="trigger-detail">
+        <div class="edit-header">
+          <a href="#" class="back-link" data-action="back-to-landing">‹ Back to Triggers</a>
+        </div>
+        <div class="trigger-detail__head">
+          <div class="trigger-detail__head-text">
+            <div class="trigger-detail__head-icon" id="detailIcon" aria-hidden="true">🎓</div>
+            <div>
+              <h1 class="trigger-detail__title" id="detailTitle">When user receives access</h1>
+              <p class="trigger-detail__sub" id="detailSub">Fires whenever any user gains access to any Apprentice product — regardless of how that access was granted.</p>
+            </div>
+          </div>
+          <button class="btn btn--primary" data-action="add-automation" id="detailAddBtn">
+            <span class="btn__icon">+</span> Add Automation
+          </button>
+        </div>
+
+        <div class="auto-list" id="autoList">
+          <!-- JS populates with automation rows OR empty state -->
+        </div>
+      </section>
+
+      <!-- ============================================= -->
+      <!-- VIEW: AUTOMATION EDIT                          -->
+      <!-- Step A: Scope (Completion only)                -->
+      <!-- Step B: Trigger target (cascading dropdowns)   -->
+      <!-- Step C: Action picker                          -->
+      <!-- Step C1: Sub-op selector (ESP Tag / Ultimatum) -->
+      <!-- Step D: Configure the action + Timing + Cond   -->
+      <!-- Save & Activate footer (always clickable).     -->
+      <!-- ============================================= -->
+      <section class="view" data-view="automation-edit">
+        <div class="edit-header">
+          <a href="#" class="back-link" data-action="back-to-detail">‹ Back to <span id="backLinkTriggerName">trigger</span></a>
+        </div>
+
+        <div class="edit-title-row">
+          <div class="edit-title-row__heading">
+            <h1 class="edit-title-row__title" id="editTitle">New automation</h1>
+            <p class="edit-title-row__sub" id="editSub">Configure what happens when this trigger fires.</p>
+          </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- STAGE 1: PICKER (scope + target + action)      -->
+        <!-- The "design" half of the flow — gathers what    -->
+        <!-- to fire on, then opens picker. Compact.        -->
+        <!-- ============================================= -->
+        <div class="stage" data-stage="picker" hidden>
+
+          <!-- Step A — Scope (Completion only) -->
+          <section class="step" id="stepScope" hidden>
+            <div class="step__head">
+              <span class="step__num">1</span>
+              <div class="step__head-text">
+                <h3 class="step__title">Fire when student completes a:</h3>
+                <p class="step__sub">Pick the level of completion that should trigger automations.</p>
+              </div>
+            </div>
+            <div class="step__body">
+              <div class="scope-row" id="scopeRow">
+                <label class="scope-pill">
+                  <input type="radio" name="completionScope" value="course" checked>
+                  <span class="scope-pill__body">
+                    <span class="scope-pill__icon" aria-hidden="true">📚</span>
+                    <span class="scope-pill__label">Course</span>
+                    <span class="scope-pill__sub">Most common</span>
+                  </span>
+                </label>
+                <label class="scope-pill">
+                  <input type="radio" name="completionScope" value="module">
+                  <span class="scope-pill__body">
+                    <span class="scope-pill__icon" aria-hidden="true">📂</span>
+                    <span class="scope-pill__label">Module</span>
+                    <span class="scope-pill__sub">A section within a course</span>
+                  </span>
+                </label>
+                <label class="scope-pill">
+                  <input type="radio" name="completionScope" value="lesson">
+                  <span class="scope-pill__body">
+                    <span class="scope-pill__icon" aria-hidden="true">📄</span>
+                    <span class="scope-pill__label">Lesson</span>
+                    <span class="scope-pill__sub">A single lesson</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- Step B — Trigger target (cascading) -->
+          <section class="step" id="stepTarget">
+            <div class="step__head">
+              <span class="step__num" id="stepTargetNum">1</span>
+              <div class="step__head-text">
+                <h3 class="step__title" id="stepTargetTitle">For product</h3>
+                <p class="step__sub" id="stepTargetSub">Which Apprentice product should this automation watch for?</p>
+              </div>
+            </div>
+            <div class="step__body">
+              <div class="target-fields" id="targetFields">
+                <!-- JS injects 1–3 dropdowns based on trigger + scope -->
+              </div>
+            </div>
+          </section>
+
+          <!-- Step C — Action picker -->
+          <section class="step" id="stepAction">
+            <div class="step__head">
+              <span class="step__num" id="stepActionNum">2</span>
+              <div class="step__head-text">
+                <h3 class="step__title">Pick the action</h3>
+                <p class="step__sub">Choose what should happen when this trigger fires.</p>
+              </div>
+            </div>
+            <div class="step__body">
+              <div class="picker__list" id="actionList">
+                <!-- JS populates with action rows -->
+              </div>
+            </div>
+          </section>
+
+        </div>
+        <!-- /stage picker -->
+
+        <!-- ============================================= -->
+        <!-- STAGE 2: SUB-OP SELECTOR (ESP Tag, Ultimatum)  -->
+        <!-- Two big choice cards — clicking IS the choice. -->
+        <!-- ============================================= -->
+        <div class="stage" data-stage="subop" hidden>
+          <div class="subop">
+            <div class="subop__back">
+              <button class="text-link subop__back-link" data-action="back-to-picker">
+                <span aria-hidden="true">←</span> Back to actions
+              </button>
+            </div>
+            <div class="subop__header">
+              <span class="subop__header-icon" id="subopHeaderIcon" aria-hidden="true">📩</span>
+              <div class="subop__header-body">
+                <h3 class="subop__header-name" id="subopHeaderName">ESP Tag</h3>
+                <p class="subop__header-sub" id="subopHeaderSub">What should happen with this user's tag?</p>
+              </div>
+            </div>
+            <div class="subop__list" id="subopList">
+              <!-- JS populates the two cards -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- STAGE 3: CONFIGURE                              -->
+        <!-- Action pill + per-action target + Timing + Cond -->
+        <!-- ============================================= -->
+        <div class="stage" data-stage="configure" hidden>
+          <div class="configure">
+
+            <!-- Read-only summary of trigger context (back link to edit) -->
+            <div class="trigger-context" id="triggerContext">
+              <span class="trigger-context__icon" aria-hidden="true">🎯</span>
+              <span class="trigger-context__text" id="triggerContextText">On <strong>access granted</strong> for <strong>Photography Masterclass</strong></span>
+              <button class="text-link trigger-context__edit" data-action="edit-trigger-context">Edit</button>
+            </div>
+
+            <!-- Action pill (with Change link) -->
+            <div class="action-pill" id="actionPill">
+              <span class="action-pill__icon" id="pillIcon">📩</span>
+              <div class="action-pill__body">
+                <div class="action-pill__name" id="pillName">Add tag</div>
+                <div class="action-pill__desc" id="pillDesc">Apply a tag to this user in your ESP</div>
+              </div>
+              <button class="text-link" data-action="change-action">Change</button>
+            </div>
+
+            <!-- Action-specific config target -->
+            <div class="configure__section" id="configSection">
+              <!-- JS populates based on action -->
+            </div>
+
+            <!-- Optional Timing block (collapsed by default) -->
+            <div class="timing" id="timingWrap" aria-live="polite">
+              <div class="timing__collapsed" id="timingCollapsed">
+                <button class="text-link text-link--primary" data-action="add-delay">
+                  + Add a delay
+                </button>
+                <span class="timing__hint">fires immediately by default</span>
+              </div>
+              <div class="timing__expanded" id="timingExpanded" hidden>
+                <div class="timing__label">When should this fire?</div>
+                <div class="timing__row">
+                  <span class="timing__kw">FIRE</span>
+                  <input type="number" class="input input--sm timing__num" id="delayValue" min="1" value="2" aria-label="Delay amount">
+                  <div class="select-wrap">
+                    <select class="input input--select input--sm" id="delayUnit" aria-label="Delay unit">
+                      <option value="minutes">minutes</option>
+                      <option value="hours">hours</option>
+                      <option value="days" selected>days</option>
+                      <option value="weeks">weeks</option>
+                      <option value="months">months</option>
+                    </select>
+                  </div>
+                  <span class="timing__suffix" id="timingSuffix">after the trigger fires</span>
+                </div>
+                <button class="text-link text-link--muted" data-action="remove-delay">Remove delay</button>
+              </div>
+            </div>
+
+            <!-- Optional Condition block (collapsed by default) -->
+            <div class="condition" id="conditionWrap">
+              <div class="condition__collapsed" id="conditionCollapsed">
+                <button class="text-link text-link--primary" data-action="add-condition">
+                  + Add a condition
+                </button>
+                <span class="condition__hint">Only fire this action if a field matches a value</span>
+              </div>
+              <div class="condition__expanded" id="conditionExpanded" hidden>
+                <div class="condition__label">Only fire this action if…</div>
+                <div class="condition__row">
+                  <span class="condition__kw">IF</span>
+                  <div class="select-wrap">
+                    <select class="input input--select input--sm" id="condField">
+                      <!-- JS injects per-trigger field options -->
+                    </select>
+                  </div>
+                  <div class="select-wrap">
+                    <select class="input input--select input--sm" id="condOp">
+                      <option value="equals">equals</option>
+                      <option value="not_equals">does not equal</option>
+                      <option value="contains">contains</option>
+                    </select>
+                  </div>
+                  <div class="select-wrap condition__value-wrap" id="condValueWrap">
+                    <!-- JS injects select or text based on field -->
+                  </div>
+                </div>
+                <div class="condition__then">
+                  <span class="condition__kw">THEN</span>
+                  <span class="condition__then-text">fire the action</span>
+                </div>
+                <button class="text-link text-link--muted" data-action="remove-condition">Remove condition</button>
+              </div>
+            </div>
+
+            <!-- Save & Activate footer -->
+            <div class="configure__cta">
+              <button class="btn btn--primary btn--xl btn--pulse" data-action="save-automation" id="saveAutomationBtn">
+                Save &amp; Activate
+              </button>
+              <button class="text-link text-link--muted" data-action="cancel-automation">Cancel</button>
+            </div>
+
+          </div>
+        </div>
+        <!-- /stage configure -->
+
+      </section>
+      <!-- /view automation-edit -->
+
+    </div>
+    <!-- /app__frame -->
+
+    <!-- ====== Test drawer (per-automation) ====== -->
+    <div class="drawer" id="testDrawer" hidden>
+      <div class="drawer__backdrop" data-action="close-drawer"></div>
+      <aside class="drawer__dialog" aria-label="Test this automation">
+        <header class="drawer__header">
+          <div>
+            <h3 class="drawer__title">Test this automation</h3>
+            <p class="drawer__sub" id="drawerSub">Run the automation with sample data and see what would happen.</p>
+          </div>
+          <button class="icon-btn" data-action="close-drawer" aria-label="Close">×</button>
+        </header>
+
+        <div class="drawer__safety">
+          <span class="drawer__safety-icon">🛡</span>
+          <span><strong>Test mode</strong> — nothing is written to your ESP, no webhook is sent, no campaign starts, no access changes.</span>
+        </div>
+
+        <div class="drawer__body" id="drawerBody">
+          <section class="drawer__section">
+            <h4 class="drawer__section-title">Sample data</h4>
+            <p class="drawer__section-sub">Edit these values to test different scenarios.</p>
+
+            <div class="drawer__field">
+              <label class="field-label">Student email</label>
+              <input type="email" class="input" id="testEmail" value="alice@example.com">
+            </div>
+            <div class="drawer__field">
+              <label class="field-label" id="testContextLabel">Product they joined</label>
+              <input type="text" class="input" id="testContext" value="Photography Masterclass" readonly>
+            </div>
+            <div class="drawer__field" id="testSourceWrap">
+              <label class="field-label">Source</label>
+              <div class="select-wrap">
+                <select class="input input--select" id="testSource">
+                  <option>WooCommerce</option>
+                  <option>Stripe</option>
+                  <option>Webhook</option>
+                  <option>Form</option>
+                  <option>Admin</option>
+                  <option>API</option>
+                </select>
+              </div>
+            </div>
+            <div class="drawer__field" id="testRoleWrap">
+              <label class="field-label">User role</label>
+              <div class="select-wrap">
+                <select class="input input--select" id="testRole">
+                  <option>Subscriber</option>
+                  <option>Customer</option>
+                  <option>Student</option>
+                  <option>Administrator</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section class="drawer__result" id="drawerResult" hidden>
+            <!-- JS injects success / info / error banner -->
+          </section>
+        </div>
+
+        <footer class="drawer__footer">
+          <button class="text-link text-link--muted" data-action="close-drawer">Cancel</button>
+          <button class="btn btn--primary btn--pulse" data-action="run-test">⚡ Run test</button>
+        </footer>
+      </aside>
+    </div>
+
+    <!-- ====== Remove confirmation modal ====== -->
+    <div class="modal" id="removeModal" hidden>
+      <div class="modal__backdrop" data-action="close-modal"></div>
+      <div class="modal__dialog">
+        <h3 class="modal__title">Remove this automation?</h3>
+        <p class="modal__text">This automation will stop firing. You can undo within 5 seconds, or recreate it later.</p>
+        <div class="modal__actions">
+          <button class="btn btn--ghost" data-action="close-modal">Keep automation</button>
+          <button class="btn btn--danger" data-action="confirm-remove">Remove automation</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Per-row popover ====== -->
+    <div class="popover" id="rowPopover" hidden>
+      <button class="popover__item" data-action="popover-edit">✏️ Edit</button>
+      <button class="popover__item" data-action="popover-test">⚡ Test this automation</button>
+      <button class="popover__item" data-action="popover-toggle">⏸ Disable</button>
+      <div class="popover__divider"></div>
+      <button class="popover__item popover__item--danger" data-action="popover-remove">🗑 Remove</button>
+    </div>
+
+    <!-- ====== Toast container ====== -->
+    <div class="toasts" id="toasts"></div>
+
+    <!-- ====== Spotlight overlay for guide ====== -->
+    <div class="spotlight" id="spotlight" hidden aria-hidden="true">
+      <div class="spotlight__hole" id="spotlightHole"></div>
+    </div>
+
+    <!-- ====== Guide / coach marks ====== -->
+    <div class="guide" id="guide" hidden>
+      <div class="guide__content">
+        <h4 class="guide__title" id="guideTitle">Step 1 of 5</h4>
+        <p class="guide__text" id="guideText">Welcome!</p>
+        <div class="guide__progress" id="guideProgress" aria-hidden="true">
+          <span class="guide__dot"></span>
+          <span class="guide__dot"></span>
+          <span class="guide__dot"></span>
+          <span class="guide__dot"></span>
+          <span class="guide__dot"></span>
+        </div>
+        <div class="guide__actions">
+          <button class="btn btn--ghost btn--sm" data-action="guide-skip">Skip tour</button>
+          <button class="btn btn--primary btn--sm" data-action="guide-next" id="guideNextBtn">Got it</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="apprentice-triggers.js"></script>
+</body>
+</html>
