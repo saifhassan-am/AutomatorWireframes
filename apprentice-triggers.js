@@ -20,6 +20,7 @@
 
   // ─── Constants ──────────────────────────────────────────
   const GUIDE_SEEN_KEY = 'apprentice_triggers_guide_seen';
+  const DISAMBIG_BANNER_KEY = 'apprentice_triggers_disambig_banner_dismissed';
 
   // ─── Demo data ──────────────────────────────────────────
   const PRODUCTS = [
@@ -79,9 +80,9 @@
     granted: {
       id: 'granted',
       name: 'When user receives access',
-      description: 'Fires whenever any user gains access to any Apprentice product — regardless of how that access was granted.',
+      description: 'Runs every time someone gets access to an Apprentice product — no matter how they got in (purchase, form, webhook, manual grant).',
       icon: '🎓',
-      lifecycle: 'forward',  // → defaults sub-ops to Add / Start
+      lifecycle: 'forward',  // → Ultimatum sub-op defaults to Start
       hasScope: false,
       hasGrantAction: true,
       hasSourceCondition: true,
@@ -89,9 +90,9 @@
     revoked: {
       id: 'revoked',
       name: 'When access is revoked',
-      description: 'Fires whenever any user loses access to an Apprentice product — refunds, expired subscriptions, manual revokes, all included.',
+      description: 'Runs every time someone loses access to an Apprentice product — refunds, expired subscriptions, or admin removals.',
       icon: '🔒',
-      lifecycle: 'reverse',  // → defaults sub-ops to Remove / Stop
+      lifecycle: 'reverse',  // → Ultimatum sub-op defaults to Stop
       hasScope: false,
       hasGrantAction: false, // semantically off-brand
       hasSourceCondition: true,
@@ -99,7 +100,7 @@
     completion: {
       id: 'completion',
       name: 'When student completes content',
-      description: 'Fires when a student completes a course, module, or lesson. The highest-volume Apprentice automation.',
+      description: 'Runs when a student finishes a course, module, or lesson.',
       icon: '🏆',
       lifecycle: 'forward',
       hasScope: true,
@@ -109,9 +110,9 @@
     drip_unlock: {
       id: 'drip_unlock',
       name: 'When drip content unlocks',
-      description: 'Fires when a drip-scheduled lesson unlocks for a user.',
+      description: 'Runs when a drip-scheduled lesson becomes available to a student.',
       icon: '🔓',
-      lifecycle: 'forward',         // → defaults sub-ops to Add / Start
+      lifecycle: 'forward',         // → Ultimatum sub-op defaults to Start
       hasScope: false,              // Drip Unlock is always lesson-scope in v1
       hasGrantAction: true,
       hasSourceCondition: false,    // unlock is system-driven, no "source" concept
@@ -125,21 +126,18 @@
   const ACTIONS = [
     {
       key: 'esp_tag',
-      name: 'ESP Tag',
-      desc: 'Add or remove a tag for this user in your connected ESP.',
+      name: 'Email tag',
+      desc: 'Apply tags in your connected email service provider.',
       icon: '📩',
       iconClass: 'esp',
-      subOps: [
-        { key: 'add',    name: 'Add tag',    icon: '➕', desc: 'Apply a tag to this user in your ESP.' },
-        { key: 'remove', name: 'Remove tag', icon: '➖', desc: 'Remove a tag from this user in your ESP.' },
-      ],
+      subOps: null,
       configShape: 'esp_tag',
       availableOn: ['granted', 'revoked', 'completion', 'drip_unlock'],
     },
     {
       key: 'webhook',
       name: 'Send Webhook',
-      desc: 'POST to a URL with the trigger context — for Zapier, internal CRMs, or Slack.',
+      desc: 'Send the event details to any URL — useful for Zapier, an in-house CRM, or Slack notifications.',
       icon: '↗',
       iconClass: 'webhook',
       subOps: null,
@@ -149,7 +147,7 @@
     {
       key: 'ultimatum_campaign',
       name: 'Ultimatum Campaign',
-      desc: 'Start or stop an Ultimatum scarcity countdown for this user.',
+      desc: 'Start or stop an Ultimatum countdown for this user.',
       icon: '⏱',
       iconClass: 'ultimatum',
       subOps: [
@@ -162,7 +160,7 @@
     {
       key: 'grant_apprentice_access',
       name: 'Grant Apprentice Access',
-      desc: 'Unlock another Apprentice product — the "finish A → unlock B" pattern.',
+      desc: 'Give this student access to a different course — perfect for chained learning paths (finish Beginner → unlock Intermediate).',
       icon: '🎓',
       iconClass: 'grant',
       subOps: null,
@@ -175,17 +173,17 @@
   const GUIDE_STEPS = [
     {
       title: 'Welcome',
-      text: 'This is the new <strong>Triggers</strong> page where you wire native Thrive actions to Apprentice events — access changes, completion, and <strong>drip content unlocks</strong>. Click any trigger card to begin.',
+      text: 'This is the new <strong>Triggers</strong> page. Set up automations that run when something happens in your courses — access changes, completions, and <strong>drip content unlocks</strong>. Click any card to begin.',
       target: '#triggerCards',
     },
     {
       title: 'Trigger detail',
-      text: 'This is the list of automations under one trigger. Each row is a rule. Click <strong>+ Add Automation</strong> to create one.',
+      text: 'Each row here is one automation. Click <strong>+ Add Automation</strong> to create another.',
       target: '[data-view="trigger-detail"] .auto-list',
     },
     {
       title: 'Pick what to do',
-      text: 'Pick what to do — tag in your ESP, send a webhook, start an Ultimatum campaign, or grant another course.',
+      text: 'Pick what to do — apply a tag in your email service provider, send a webhook, start an Ultimatum campaign, or grant access to another course.',
       target: '#stepAction',
     },
     {
@@ -242,6 +240,26 @@
   };
   const uid = () => Math.random().toString(36).slice(2, 10);
   const escapeAttr = v => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+  // Webhook payload variables — mirrors Thrive Leads webhook engine's
+  // dynamic-value picker. Available in the Fields/Headers value-picker
+  // dropdown for the Send Webhook action.
+  const WEBHOOK_VARIABLES = [
+    { key: 'email',   placeholder: '%email%',   description: 'The user\'s email address' },
+    { key: 'name',    placeholder: '%name%',    description: 'The user\'s display name' },
+    { key: 'product', placeholder: '%product%', description: 'The Apprentice product (course / module / lesson)' },
+    { key: 'event',   placeholder: '%event%',   description: 'The trigger event (granted / revoked / completion / drip_unlock)' },
+    { key: 'source',  placeholder: '%source%',  description: 'How the event was produced (woocommerce / form / webhook / etc.)' },
+  ];
+  function defaultWebhookFields() {
+    return [
+      { key: 'email',   value: '%email%' },
+      { key: 'name',    value: '%name%' },
+      { key: 'product', value: '%product%' },
+      { key: 'event',   value: '%event%' },
+      { key: 'source',  value: '%source%' },
+    ];
+  }
 
   // ─── Toasts ─────────────────────────────────────────────
   function toast(message, kind = 'info', duration = 3000) {
@@ -458,10 +476,10 @@
     return wrap;
   }
   function emptyStateContext(trig) {
-    if (trig.id === 'granted')     return 'a user receives access — tag them, send a webhook, start a campaign, or unlock another course';
-    if (trig.id === 'revoked')     return 'a user loses access — untag them, send a webhook, or stop a campaign';
-    if (trig.id === 'completion')  return 'a student completes content — tag them, send a webhook, start an upsell campaign, or grant the next course';
-    if (trig.id === 'drip_unlock') return 'a drip-scheduled lesson unlocks — tag the student, start a halfway-through campaign, send a webhook, or grant another product';
+    if (trig.id === 'granted')     return 'someone gets access — tag them in your email service provider, send a webhook, start a campaign, or unlock another course';
+    if (trig.id === 'revoked')     return 'someone loses access — tag them as a former member, send a webhook, or stop a campaign';
+    if (trig.id === 'completion')  return 'a student finishes content — tag them, send a webhook, start an upsell campaign, or unlock the next course';
+    if (trig.id === 'drip_unlock') return 'a drip-scheduled lesson unlocks — tag the student, start a halfway-through campaign, send a webhook, or unlock another course';
     return 'this trigger fires';
   }
 
@@ -494,15 +512,19 @@
   // Plain-English primary line — "Add tag enrolled-python in ActiveCampaign".
   function buildAutomationPrimary(a) {
     if (a.actionKey === 'esp_tag') {
-      const espLabel = ESPS.find(e => e.id === a.esp)?.label || a.esp || '(no ESP)';
-      const tag = a.tag || '(no tag)';
-      const verb = a.subOperation === 'remove' ? 'Remove tag' : 'Add tag';
-      return `${verb} <code>${tag}</code> in ${espLabel}`;
+      const espLabel = ESPS.find(e => e.id === a.esp)?.label || a.esp || '(no email service provider)';
+      const tags = Array.isArray(a.tags) ? a.tags : (a.tag ? [a.tag] : []);
+      if (tags.length === 0) return `Apply tag <code>(no tag)</code> in ${espLabel}`;
+      if (tags.length === 1) return `Apply tag <code>${tags[0]}</code> in ${espLabel}`;
+      const head = tags.slice(0, 2).map(t => `<code>${t}</code>`).join(', ');
+      const more = tags.length > 2 ? ` <span class="muted">+${tags.length - 2} more</span>` : '';
+      return `Apply tags ${head}${more} in ${espLabel}`;
     }
     if (a.actionKey === 'webhook') {
       const url = a.url || '(no URL)';
-      const shortUrl = url.length > 48 ? url.substring(0, 45) + '…' : url;
-      return `Send webhook to <code>${shortUrl}</code>`;
+      const shortUrl = url.length > 44 ? url.substring(0, 41) + '…' : url;
+      const method = (a.method || 'POST').toUpperCase();
+      return `Send <span class="auto-row__method">${method}</span> to <code>${shortUrl}</code>`;
     }
     if (a.actionKey === 'ultimatum_campaign') {
       const verb = a.subOperation === 'stop' ? 'Stop' : 'Start';
@@ -626,6 +648,10 @@
     if (!auto) return;
     state.editingId = automationId;
     state.draft = JSON.parse(JSON.stringify(auto));
+    // Backwards-compat: legacy single-tag automations migrate to tags[]
+    if (state.draft.actionKey === 'esp_tag' && !Array.isArray(state.draft.tags)) {
+      state.draft.tags = state.draft.tag ? [state.draft.tag] : [];
+    }
     enterEditView();
   }
   function enterEditView() {
@@ -663,8 +689,13 @@
       subOperation: null,
       // Step D — config
       esp: '',
-      tag: '',
+      tags: [],            // multi-tag (chip input — TD pattern)
       url: '',
+      method: 'POST',      // webhook — matches Thrive Leads webhook engine
+      format: 'json',      // webhook — JSON / form / xml
+      fields: defaultWebhookFields(triggerId),  // [{key, value}] — pre-populated payload
+      headersMode: 'none', // webhook — 'none' or 'custom'
+      headers: [],         // webhook — [{key, value}] when headersMode === 'custom'
       campaign: '',
       targetProduct: '',
       // Optional
@@ -1080,8 +1111,8 @@
 
   function pickDefaultSubOp(action, trig) {
     if (!action.subOps) return null;
-    // Forward lifecycle (granted, completion) → first sub-op (Add / Start)
-    // Reverse lifecycle (revoked) → second sub-op (Remove / Stop)
+    // Forward lifecycle (granted, completion) → first sub-op (Start)
+    // Reverse lifecycle (revoked) → second sub-op (Stop)
     return trig.lifecycle === 'reverse' ? action.subOps[1].key : action.subOps[0].key;
   }
 
@@ -1119,7 +1150,6 @@
     setTimeout(() => list.querySelector('.subop-card')?.focus(), 30);
   }
   function subOpPrompt(action) {
-    if (action.key === 'esp_tag')            return "What should happen with this user's tag?";
     if (action.key === 'ultimatum_campaign') return 'What should happen with this campaign?';
     return 'What should happen?';
   }
@@ -1237,73 +1267,258 @@
   // ─── Per-action config field renderers ──────────────────
   function renderConfigFields(section, action) {
     if (action.configShape === 'esp_tag') {
-      const verb = state.draft.subOperation === 'remove' ? 'remove' : 'add';
       const espOptions = ESPS.map(e => `<option value="${e.id}" ${state.draft.esp === e.id ? 'selected' : ''}>${e.label}</option>`).join('');
-      const tagsForEsp = ESP_TAGS[state.draft.esp] || [];
-      const tagOptions = tagsForEsp.map(t => `<option value="${t}" ${state.draft.tag === t ? 'selected' : ''}>${t}</option>`).join('');
+      const espHasTagInventory = !!state.draft.esp && Array.isArray(ESP_TAGS[state.draft.esp]) && ESP_TAGS[state.draft.esp].length > 0;
+      const selectedTags = Array.isArray(state.draft.tags) ? state.draft.tags : [];
+      const chipsHtml = selectedTags.map(t =>
+        `<span class="tag-chip"><span class="tag-chip__label">${t}</span><button type="button" class="tag-chip__remove" data-action="remove-tag" data-tag="${escapeAttr(t)}" aria-label="Remove ${escapeAttr(t)}">×</button></span>`
+      ).join('');
+      const placeholder = !state.draft.esp
+        ? 'Pick an email service provider first'
+        : (espHasTagInventory ? 'Type to search or add tags…' : 'Type a tag and press Enter…');
 
       const block = el('div');
       block.innerHTML = `
-        <h4 class="configure__section-title">Which tag should we ${verb}, and where?</h4>
+        <h4 class="configure__section-title">Which tags should we apply, and where?</h4>
         <div class="configure__field">
-          <label class="field-label">ESP</label>
+          <label class="field-label">Email service provider</label>
           <div class="select-wrap">
             <select class="input input--select" id="espSelect">
-              <option value="">— Select an ESP —</option>
+              <option value="">— Select an email service provider —</option>
               ${espOptions}
             </select>
           </div>
         </div>
         <div class="configure__field">
-          <label class="field-label">Tag</label>
-          <div class="select-wrap">
-            <select class="input input--select" id="tagSelect" ${!state.draft.esp ? 'disabled' : ''}>
-              <option value="">${state.draft.esp ? '— Select a tag —' : '— Pick an ESP first —'}</option>
-              ${tagOptions}
-            </select>
+          <label class="field-label">Tags</label>
+          <div class="tag-input ${!state.draft.esp ? 'tag-input--disabled' : ''}" id="tagInput">
+            <div class="tag-input__chips" id="tagChips">${chipsHtml}</div>
+            <div class="tag-input__entry">
+              <input type="text"
+                     class="tag-input__field"
+                     id="tagFieldInput"
+                     placeholder="${placeholder}"
+                     autocomplete="off"
+                     ${!state.draft.esp ? 'disabled' : ''}>
+              <div class="tag-input__suggestions" id="tagSuggestions" hidden></div>
+            </div>
           </div>
-          <p class="configure__hint">Pulled from your connected ESP. Update tags in your ESP and refresh — they propagate here.</p>
+          <p class="configure__hint">${
+            espHasTagInventory
+              ? 'Pulled from your email service provider\'s tag list — pick existing tags or type a new one. Press <kbd>Enter</kbd> or comma to add. All tags get applied together.'
+              : (state.draft.esp ? 'Type a tag and press <kbd>Enter</kbd> or comma to add. All tags get applied together.' : 'Pick an email service provider above to start adding tags.')
+          }</p>
         </div>
       `;
       section.appendChild(block);
+
       $('#espSelect').addEventListener('change', e => {
         state.draft.esp = e.target.value;
-        // Clear tag — prior tag may not exist in the new ESP
-        state.draft.tag = '';
+        // Don't clear existing tags — user may want to send the same tag set to a new ESP
         renderConfigure();
       });
-      $('#tagSelect').addEventListener('change', e => {
-        state.draft.tag = e.target.value;
-      });
+
+      const fieldInput = $('#tagFieldInput');
+      const suggestionsBox = $('#tagSuggestions');
+
+      function commitTag(raw) {
+        const tag = (raw || '').trim().replace(/^,+|,+$/g, '').trim();
+        if (!tag) return false;
+        const tags = Array.isArray(state.draft.tags) ? state.draft.tags.slice() : [];
+        // case-insensitive de-dup
+        if (tags.some(t => t.toLowerCase() === tag.toLowerCase())) {
+          // Visual nudge: flash existing chip
+          const existing = Array.from(document.querySelectorAll('#tagChips .tag-chip'))
+            .find(c => c.querySelector('.tag-chip__label').textContent.toLowerCase() === tag.toLowerCase());
+          if (existing) {
+            existing.classList.remove('tag-chip--flash');
+            void existing.offsetWidth; // restart animation
+            existing.classList.add('tag-chip--flash');
+          }
+          return false;
+        }
+        tags.push(tag);
+        state.draft.tags = tags;
+        renderConfigure();
+        return true;
+      }
+
+      function showSuggestions(query) {
+        if (!espHasTagInventory) {
+          suggestionsBox.hidden = true;
+          return;
+        }
+        const q = (query || '').trim().toLowerCase();
+        const inventory = ESP_TAGS[state.draft.esp] || [];
+        const taken = new Set((state.draft.tags || []).map(t => t.toLowerCase()));
+        const matches = inventory
+          .filter(t => !taken.has(t.toLowerCase()))
+          .filter(t => !q || t.toLowerCase().includes(q))
+          .slice(0, 6);
+        if (matches.length === 0) {
+          suggestionsBox.hidden = true;
+          return;
+        }
+        suggestionsBox.innerHTML = matches.map(t =>
+          `<button type="button" class="tag-suggestion" data-action="suggest-tag" data-tag="${escapeAttr(t)}">${t}</button>`
+        ).join('');
+        suggestionsBox.hidden = false;
+      }
+
+      if (fieldInput) {
+        fieldInput.addEventListener('focus', () => showSuggestions(fieldInput.value));
+        fieldInput.addEventListener('input', () => showSuggestions(fieldInput.value));
+        fieldInput.addEventListener('blur', () => {
+          // Delay so a click on a suggestion still registers
+          setTimeout(() => { suggestionsBox.hidden = true; }, 120);
+        });
+        fieldInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            commitTag(fieldInput.value);
+          } else if (e.key === 'Backspace' && fieldInput.value === '' && Array.isArray(state.draft.tags) && state.draft.tags.length > 0) {
+            // Backspace on empty input pops the last chip (TD pattern)
+            e.preventDefault();
+            state.draft.tags = state.draft.tags.slice(0, -1);
+            renderConfigure();
+          }
+        });
+      }
+
+      // Keep the chip input focused after re-render if the user was typing
+      if (state.draft._tagInputFocused && fieldInput) {
+        fieldInput.focus();
+        state.draft._tagInputFocused = false;
+      }
       return;
     }
 
     if (action.configShape === 'webhook') {
+      // Backwards-compat: legacy webhook automations migrate to the full shape
+      if (!state.draft.method)      state.draft.method = 'POST';
+      if (!state.draft.format)      state.draft.format = 'json';
+      if (!Array.isArray(state.draft.fields))  state.draft.fields = defaultWebhookFields();
+      if (!state.draft.headersMode) state.draft.headersMode = 'none';
+      if (!Array.isArray(state.draft.headers)) state.draft.headers = [];
+
+      const methodOptions = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE']
+        .map(m => `<option value="${m}" ${state.draft.method === m ? 'selected' : ''}>${m}</option>`).join('');
+      const formatOptions = [
+        { v: 'json', label: 'JSON' },
+        { v: 'form', label: 'Form' },
+        { v: 'xml',  label: 'XML' },
+      ].map(f => `<option value="${f.v}" ${state.draft.format === f.v ? 'selected' : ''}>${f.label}</option>`).join('');
+
+      const fieldsHtml = (state.draft.fields || []).map((f, i) => buildWebhookRowHtml(f, i, 'field')).join('');
+      const headersHidden = state.draft.headersMode !== 'custom';
+      const headersHtml = (state.draft.headers || []).map((h, i) => buildWebhookRowHtml(h, i, 'header')).join('');
+
       const block = el('div');
       block.innerHTML = `
-        <h4 class="configure__section-title">Where should we POST the trigger context?</h4>
+        <h4 class="configure__section-title">Webhook details</h4>
+
         <div class="configure__field">
-          <label class="field-label">URL</label>
+          <label class="field-label" for="urlInput">Webhook URL</label>
           <input type="text" class="input" id="urlInput"
-                 placeholder="https://your-tool.example.com/webhook"
+                 placeholder="https://your-tool.example.com/webhook (requires https://)"
                  value="${escapeAttr(state.draft.url || '')}">
-          <p class="configure__hint">We'll send a POST with the JSON body below. Failures are logged but won't block other automations.</p>
         </div>
-        <div class="payload-preview" aria-label="Webhook payload preview">
-          <span class="payload-preview__label">Payload</span>
-{
-  <span class="payload-preview__key">"email"</span>:   <span class="payload-preview__str">"alice@example.com"</span>,
-  <span class="payload-preview__key">"name"</span>:    <span class="payload-preview__str">"Alice Jones"</span>,
-  <span class="payload-preview__key">"product"</span>: <span class="payload-preview__str">"${escapeAttr(buildPayloadProductValue())}"</span>,
-  <span class="payload-preview__key">"event"</span>:   <span class="payload-preview__str">"${state.draft.triggerId}"</span>,
-  <span class="payload-preview__key">"source"</span>:  <span class="payload-preview__str">"woocommerce"</span>
-}
+
+        <div class="webhook-row-grid">
+          <div class="configure__field">
+            <label class="field-label" for="webhookMethod">Request type</label>
+            <div class="select-wrap">
+              <select class="input input--select" id="webhookMethod">${methodOptions}</select>
+            </div>
+          </div>
+          <div class="configure__field">
+            <label class="field-label" for="webhookFormat">Request format</label>
+            <div class="select-wrap">
+              <select class="input input--select" id="webhookFormat">${formatOptions}</select>
+            </div>
+          </div>
         </div>
+
+        <div class="configure__field">
+          <label class="field-label">
+            Fields
+            <span class="field-label__help" title="The &quot;=&quot; shows how a field is mapped. Key is the field name, value is what we send. Use the picker to insert a dynamic value like the user's email.">ⓘ</span>
+          </label>
+          <div class="webhook-rows" id="webhookFieldRows">${fieldsHtml}</div>
+          <a href="#" class="webhook-add-link" data-action="add-webhook-field">+ Add field</a>
+        </div>
+
+        <div class="configure__field">
+          <label class="field-label">Headers</label>
+          <div class="webhook-headers-mode">
+            <label class="webhook-radio">
+              <input type="radio" name="webhookHeadersMode" value="none" ${state.draft.headersMode === 'none' ? 'checked' : ''}>
+              <span>None</span>
+            </label>
+            <label class="webhook-radio">
+              <input type="radio" name="webhookHeadersMode" value="custom" ${state.draft.headersMode === 'custom' ? 'checked' : ''}>
+              <span>Custom</span>
+            </label>
+          </div>
+          <div class="webhook-headers-wrap" id="webhookHeadersWrap" ${headersHidden ? 'hidden' : ''}>
+            <div class="webhook-rows" id="webhookHeaderRows">${headersHtml}</div>
+            <a href="#" class="webhook-add-link" data-action="add-webhook-header">+ Add header</a>
+          </div>
+        </div>
+
+        <div class="configure__field webhook-test-field">
+          <button type="button" class="btn btn--ghost btn--sm" data-action="webhook-test" id="webhookTestBtn">Send test</button>
+          <span class="webhook-test-status" id="webhookTestStatus" hidden>
+            <span class="webhook-test-status__dot" aria-hidden="true"></span>
+            <span class="webhook-test-status__text"></span>
+            <a href="#" class="webhook-test-status__details" data-action="webhook-test-details" hidden>Details</a>
+          </span>
+        </div>
+        <p class="configure__hint">If the URL fails, we'll log it — your other automations still run.</p>
       `;
       section.appendChild(block);
+
       $('#urlInput').addEventListener('input', e => {
-        state.draft.url = e.target.value;
+        state.draft.url = e.target.value.trim();
+        // Clear stale test status when URL changes
+        clearWebhookTestStatus();
       });
+      $('#webhookMethod').addEventListener('change', e => {
+        state.draft.method = e.target.value;
+        clearWebhookTestStatus();
+      });
+      $('#webhookFormat').addEventListener('change', e => {
+        state.draft.format = e.target.value;
+        clearWebhookTestStatus();
+      });
+      document.querySelectorAll('input[name="webhookHeadersMode"]').forEach(r => {
+        r.addEventListener('change', e => {
+          state.draft.headersMode = e.target.value;
+          if (state.draft.headersMode === 'custom' && (state.draft.headers || []).length === 0) {
+            state.draft.headers = [{ key: '', value: '' }];
+          }
+          renderConfigure();
+        });
+      });
+      // Wire field/header row inputs (delegated)
+      const fieldRowsEl = $('#webhookFieldRows');
+      if (fieldRowsEl) wireWebhookRowInputs(fieldRowsEl, 'fields');
+      const headerRowsEl = $('#webhookHeaderRows');
+      if (headerRowsEl) wireWebhookRowInputs(headerRowsEl, 'headers');
+
+      // Restore focus to a row input if the user was typing before re-render
+      if (state.draft._webhookFocus) {
+        const { listKey, index, which } = state.draft._webhookFocus;
+        const sel = `[data-row-list="${listKey}"][data-row-index="${index}"][data-row-input="${which}"]`;
+        const focusTarget = document.querySelector(sel);
+        if (focusTarget) {
+          focusTarget.focus();
+          // Place caret at end
+          const v = focusTarget.value;
+          focusTarget.setSelectionRange(v.length, v.length);
+        }
+        state.draft._webhookFocus = null;
+      }
       return;
     }
 
@@ -1343,14 +1558,14 @@
 
       const block = el('div');
       block.innerHTML = `
-        <h4 class="configure__section-title">Which Apprentice product should we grant?</h4>
+        <h4 class="configure__section-title">Which course should we unlock for them?</h4>
         <div class="select-wrap">
           <select class="input input--select" id="targetProductSelect">
-            <option value="">— Select a product —</option>
+            <option value="">— Select a course —</option>
             ${eligible.map(p => `<option value="${p.id}" ${state.draft.targetProduct === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
           </select>
         </div>
-        <p class="configure__hint">Choose a different product than the one being ${verbHint}.</p>
+        <p class="configure__hint">Pick a different course than the one being ${verbHint}.</p>
       `;
       section.appendChild(block);
       $('#targetProductSelect').addEventListener('change', e => {
@@ -1358,6 +1573,198 @@
       });
       return;
     }
+  }
+
+  // ─── Webhook helpers (Leads-parity Send Webhook UI) ─────
+  function buildWebhookRowHtml(row, index, kind /* 'field' | 'header' */) {
+    const listKey = kind === 'field' ? 'fields' : 'headers';
+    const removeAction = kind === 'field' ? 'remove-webhook-field' : 'remove-webhook-header';
+    return `
+      <div class="webhook-row" data-row-index="${index}">
+        <input type="text" class="input webhook-row__key"
+               placeholder="Key"
+               value="${escapeAttr(row.key || '')}"
+               data-row-input="key" data-row-list="${listKey}" data-row-index="${index}">
+        <span class="webhook-row__op" aria-hidden="true">=</span>
+        <div class="webhook-row__value-wrap">
+          <input type="text" class="input webhook-row__value"
+                 placeholder="Value"
+                 value="${escapeAttr(row.value || '')}"
+                 data-row-input="value" data-row-list="${listKey}" data-row-index="${index}">
+          <button type="button" class="webhook-row__picker"
+                  data-action="open-webhook-picker"
+                  data-row-list="${listKey}" data-row-index="${index}"
+                  title="Insert dynamic value" aria-label="Insert dynamic value">{ }</button>
+        </div>
+        <button type="button" class="webhook-row__remove"
+                data-action="${removeAction}" data-row-index="${index}"
+                aria-label="Remove">×</button>
+      </div>
+    `;
+  }
+  function wireWebhookRowInputs(container, listKey) {
+    container.querySelectorAll('input[data-row-input]').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const which = e.target.dataset.rowInput;
+        const index = parseInt(e.target.dataset.rowIndex, 10);
+        const list  = state.draft[listKey] || [];
+        if (!list[index]) return;
+        list[index][which] = e.target.value;
+        clearWebhookTestStatus();
+        // Stamp focus so we can restore it on re-render
+        state.draft._webhookFocus = { listKey, index, which };
+      });
+    });
+  }
+  function clearWebhookTestStatus() {
+    const status = document.getElementById('webhookTestStatus');
+    if (status) {
+      status.hidden = true;
+      status.classList.remove('webhook-test-status--ok', 'webhook-test-status--err');
+      const txt = status.querySelector('.webhook-test-status__text');
+      if (txt) txt.textContent = '';
+      const det = status.querySelector('.webhook-test-status__details');
+      if (det) det.hidden = true;
+    }
+    state.lastWebhookTest = null;
+  }
+  function runWebhookTest() {
+    const draft = state.draft;
+    if (!draft || !draft.url || !/^https?:\/\//i.test(draft.url)) {
+      toast('Enter a valid URL (starting with https://) before testing.', 'error', 4500);
+      const u = document.getElementById('urlInput');
+      if (u) u.focus();
+      return;
+    }
+    const btn = document.getElementById('webhookTestBtn');
+    const status = document.getElementById('webhookTestStatus');
+    const text = status?.querySelector('.webhook-test-status__text');
+    const detailsLink = status?.querySelector('.webhook-test-status__details');
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    if (status) {
+      status.hidden = false;
+      status.classList.remove('webhook-test-status--ok', 'webhook-test-status--err');
+      if (text) text.textContent = 'Sending test request…';
+      if (detailsLink) detailsLink.hidden = true;
+    }
+
+    // Simulate a real request — prototype-only
+    const startedAt = Date.now();
+    const isOk = !/error|fail|broken/i.test(draft.url); // demo: URLs containing those words "fail"
+    const status_code = isOk ? 200 : 502;
+    const status_text = isOk ? 'OK' : 'Bad Gateway';
+    const body = isOk
+      ? JSON.stringify({ received: true, message: 'Webhook received successfully', id: uid() }, null, 2)
+      : '<html><body><h1>502 Bad Gateway</h1><p>The upstream server returned an invalid response.</p></body></html>';
+
+    setTimeout(() => {
+      const duration = Date.now() - startedAt;
+      state.lastWebhookTest = {
+        ok: isOk,
+        statusCode: status_code,
+        statusText: status_text,
+        method: draft.method || 'POST',
+        url: draft.url,
+        duration: `${duration}ms`,
+        body,
+        error: isOk ? null : 'The destination URL responded with a 5xx error.',
+      };
+      if (btn) { btn.disabled = false; btn.textContent = 'Send test'; }
+      if (status) {
+        status.classList.add(isOk ? 'webhook-test-status--ok' : 'webhook-test-status--err');
+        if (text) text.textContent = isOk
+          ? `Webhook sent successfully (${status_code} ${status_text} · ${duration}ms)`
+          : `Webhook failed (${status_code} ${status_text})`;
+        if (detailsLink) detailsLink.hidden = false;
+      }
+    }, 700 + Math.random() * 400);
+  }
+  function openWebhookTestDetails() {
+    if (!state.lastWebhookTest) return;
+    const t = state.lastWebhookTest;
+    const overlay = document.getElementById('webhookTestModal');
+    if (!overlay) return;
+    overlay.hidden = false;
+    overlay.classList.toggle('webhook-test-modal--err', !t.ok);
+    overlay.querySelector('.webhook-test-modal__title').textContent = 'Connection details';
+    overlay.querySelector('[data-test-status]').textContent       = `${t.statusCode} ${t.statusText}`;
+    overlay.querySelector('[data-test-duration]').textContent     = t.duration;
+    overlay.querySelector('[data-test-method]').textContent       = t.method;
+    overlay.querySelector('[data-test-endpoint]').textContent     = t.url;
+    overlay.querySelector('[data-test-body]').textContent         = t.body;
+    const errRow = overlay.querySelector('[data-test-error-row]');
+    const errEl  = overlay.querySelector('[data-test-error]');
+    if (t.error) { errRow.hidden = false; errEl.textContent = t.error; }
+    else         { errRow.hidden = true;  errEl.textContent = ''; }
+    const inlineAlert = overlay.querySelector('.webhook-test-modal__alert');
+    if (inlineAlert) inlineAlert.hidden = t.ok;
+  }
+  function closeWebhookTestModal() {
+    const overlay = document.getElementById('webhookTestModal');
+    if (overlay) overlay.hidden = true;
+  }
+  // Insert a variable placeholder into the value input for the picker that opened
+  function insertWebhookVariable(listKey, index, placeholder) {
+    const list = state.draft[listKey] || [];
+    if (!list[index]) return;
+    const sel = `[data-row-input="value"][data-row-list="${listKey}"][data-row-index="${index}"]`;
+    const input = document.querySelector(sel);
+    if (input) {
+      // Insert at caret position if focused, otherwise append
+      const start = (input === document.activeElement) ? input.selectionStart : input.value.length;
+      const end   = (input === document.activeElement) ? input.selectionEnd   : input.value.length;
+      const next = input.value.slice(0, start) + placeholder + input.value.slice(end);
+      list[index].value = next;
+      state.draft._webhookFocus = { listKey, index, which: 'value' };
+    } else {
+      list[index].value = (list[index].value || '') + placeholder;
+    }
+    closeWebhookPicker();
+    renderConfigure();
+  }
+  function openWebhookPicker(buttonEl) {
+    closeWebhookPicker();
+    const listKey = buttonEl.dataset.rowList;
+    const index   = parseInt(buttonEl.dataset.rowIndex, 10);
+    const dropdown = document.createElement('div');
+    dropdown.className = 'webhook-picker-dropdown';
+    dropdown.id = 'webhookPickerDropdown';
+    dropdown.innerHTML = `
+      <div class="webhook-picker-dropdown__title">Insert dynamic value</div>
+      ${WEBHOOK_VARIABLES.map(v => `
+        <button type="button" class="webhook-picker-item"
+                data-action="pick-webhook-variable"
+                data-list="${listKey}" data-index="${index}"
+                data-placeholder="${escapeAttr(v.placeholder)}">
+          <code>${v.placeholder}</code>
+          <span class="webhook-picker-item__desc">${v.description}</span>
+        </button>
+      `).join('')}
+    `;
+    document.body.appendChild(dropdown);
+    const rect = buttonEl.getBoundingClientRect();
+    dropdown.style.position = 'absolute';
+    dropdown.style.top  = `${rect.bottom + window.scrollY + 4}px`;
+    dropdown.style.left = `${rect.left   + window.scrollX - 120}px`;
+    // Outside-click closes
+    setTimeout(() => {
+      document.addEventListener('click', closeWebhookPickerOnOutside, { once: true });
+    }, 0);
+  }
+  function closeWebhookPicker() {
+    const dropdown = document.getElementById('webhookPickerDropdown');
+    if (dropdown) dropdown.remove();
+  }
+  function closeWebhookPickerOnOutside(e) {
+    if (e.target.closest('.webhook-picker-dropdown') || e.target.closest('.webhook-row__picker')) {
+      // Re-arm — picker stayed open because click was inside
+      setTimeout(() => {
+        document.addEventListener('click', closeWebhookPickerOnOutside, { once: true });
+      }, 0);
+      return;
+    }
+    closeWebhookPicker();
   }
 
   function buildPayloadProductValue() {
@@ -1511,13 +1918,14 @@
     // Step D: action target picked?
     if (action.configShape === 'esp_tag') {
       if (!state.draft.esp) {
-        toast('Please pick an ESP before saving.', 'error', 4500);
+        toast('Please pick an email service provider before saving.', 'error', 4500);
         focusInConfigure('#espSelect');
         return;
       }
-      if (!state.draft.tag) {
-        toast('Please pick a tag before saving.', 'error', 4500);
-        focusInConfigure('#tagSelect');
+      const tagsArr = Array.isArray(state.draft.tags) ? state.draft.tags : [];
+      if (tagsArr.length === 0) {
+        toast('Please add at least one tag before saving.', 'error', 4500);
+        focusInConfigure('#tagFieldInput');
         return;
       }
     }
@@ -1527,6 +1935,19 @@
         toast('Please enter a webhook URL before saving.', 'error', 4500);
         focusInConfigure('#urlInput');
         return;
+      }
+      if (!/^https?:\/\//i.test(url)) {
+        toast('Webhook URL must start with https:// (or http:// for testing).', 'error', 5000);
+        focusInConfigure('#urlInput');
+        return;
+      }
+      // If headersMode is custom, every custom header must have a key
+      if (state.draft.headersMode === 'custom') {
+        const incompleteHeader = (state.draft.headers || []).find(h => h.value && !h.key);
+        if (incompleteHeader) {
+          toast('Each custom header needs a key. Add one or remove the row.', 'error', 5000);
+          return;
+        }
       }
     }
     if (action.configShape === 'ultimatum_campaign') {
@@ -1568,7 +1989,7 @@
           (state.draft.actionKey === 'esp_tag' && used.includes('webhook')) ||
           (state.draft.actionKey === 'webhook' && used.includes('esp_tag'));
         if (isMutex) {
-          toast(`You can have either an ESP Tag or a Send Webhook on the same ${targetDisplay}, not both. Edit the existing one to switch.`, 'error', 5500);
+          toast(`You can have either an Email tag or a Send Webhook on the same ${targetDisplay}, not both. Edit the existing one to switch.`, 'error', 5500);
           return;
         }
       }
@@ -1818,13 +2239,19 @@
       : '';
 
     if (action.key === 'esp_tag') {
-      const espLabel = ESPS.find(es => es.id === auto.esp)?.label || auto.esp;
-      const verb = auto.subOperation === 'remove' ? 'remove' : 'apply';
-      return `Would ${verb} tag <code>${auto.tag}</code> on ${e} in <strong>${espLabel}</strong>${inPhrase}${becauseTail}.`;
+      const espLabel = ESPS.find(es => es.id === auto.esp)?.label || auto.esp || '(no email service provider)';
+      const tags = Array.isArray(auto.tags) ? auto.tags : (auto.tag ? [auto.tag] : []);
+      const noun = tags.length === 1 ? 'tag' : 'tags';
+      const tagList = tags.map(t => `<code>${t}</code>`).join(', ');
+      return `Would apply ${noun} ${tagList} on ${e} in <strong>${espLabel}</strong>${inPhrase}${becauseTail}.`;
     }
     if (action.key === 'webhook') {
       const url = auto.url || '(no URL)';
-      return `Would POST the trigger payload for ${e} to <code>${url}</code>${inPhrase}${becauseTail}.`;
+      const method = (auto.method || 'POST').toUpperCase();
+      const format = (auto.format || 'json').toUpperCase();
+      const fieldCount = Array.isArray(auto.fields) ? auto.fields.filter(f => f.key && f.value).length : 0;
+      const fieldNote = fieldCount > 0 ? ` with ${fieldCount} mapped field${fieldCount === 1 ? '' : 's'}` : '';
+      return `Would send a <strong>${method}</strong> (${format}) request${fieldNote} for ${e} to <code>${url}</code>${inPhrase}${becauseTail}.`;
     }
     if (action.key === 'ultimatum_campaign') {
       const verb = auto.subOperation === 'stop' ? 'stop' : 'start';
@@ -1957,9 +2384,9 @@
         product: 'photo-master',
         course: '', module: '', lesson: '',
         actionKey: 'esp_tag',
-        subOperation: 'add',
+        subOperation: null,
         esp: 'activecampaign',
-        tag: 'photo-student',
+        tags: ['photo-student', 'enrolled-python'],
         url: '', campaign: '', targetProduct: '',
         timing: { mode: 'immediate' },
         condition: null,
@@ -1973,7 +2400,7 @@
         course: '', module: '', lesson: '',
         actionKey: 'ultimatum_campaign',
         subOperation: 'start',
-        esp: '', tag: '', url: '',
+        esp: '', tags: [], url: '',
         campaign: 'Welcome 7-day',
         targetProduct: '',
         timing: { mode: 'delay', delayValue: 1, delayUnit: 'days' },
@@ -1990,7 +2417,7 @@
         course: 'beginner-photo', module: '', lesson: '',
         actionKey: 'grant_apprentice_access',
         subOperation: null,
-        esp: '', tag: '', url: '', campaign: '',
+        esp: '', tags: [], url: '', campaign: '',
         targetProduct: 'intermediate-photo',
         timing: { mode: 'delay', delayValue: 7, delayUnit: 'days' },
         condition: null,
@@ -2003,9 +2430,9 @@
         product: '',
         course: 'beginner-photo', module: '', lesson: '',
         actionKey: 'esp_tag',
-        subOperation: 'add',
+        subOperation: null,
         esp: 'activecampaign',
-        tag: 'beginner-graduate',
+        tags: ['beginner-graduate'],
         url: '', campaign: '', targetProduct: '',
         timing: { mode: 'immediate' },
         condition: null,
@@ -2026,9 +2453,9 @@
         module: 'm1',                // Camera basics
         lesson: 'l1',                // Aperture
         actionKey: 'esp_tag',
-        subOperation: 'add',
+        subOperation: null,
         esp: 'activecampaign',
-        tag: 'halfway-through-photography',
+        tags: ['halfway-through-photography', 'lesson-6-unlocked'],
         url: '', campaign: '', targetProduct: '',
         timing: { mode: 'immediate' },
         condition: null,
@@ -2049,10 +2476,25 @@
     closeRemoveModal();
     closeTestDrawer();
     try { localStorage.removeItem(GUIDE_SEEN_KEY); } catch (_) { /* ignore */ }
+    try { localStorage.removeItem(DISAMBIG_BANNER_KEY); } catch (_) { /* ignore */ }
     renderTriggersLanding();
     setView('triggers-landing');
+    applyDisambigBannerState();
     toast('Prototype reset. Starting fresh.', 'info');
     setTimeout(() => showGuide(0), 400);
+  }
+
+  // ─── Disambiguation banner ──────────────────────────────
+  function applyDisambigBannerState() {
+    const banner = document.getElementById('disambigBanner');
+    if (!banner) return;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(DISAMBIG_BANNER_KEY) === '1'; } catch (_) { /* ignore */ }
+    banner.hidden = dismissed;
+  }
+  function dismissDisambigBanner() {
+    try { localStorage.setItem(DISAMBIG_BANNER_KEY, '1'); } catch (_) { /* ignore */ }
+    applyDisambigBannerState();
   }
 
   // ─── Event wiring ───────────────────────────────────────
@@ -2076,6 +2518,86 @@
         case 'add-condition':   addCondition(); break;
         case 'remove-condition': removeCondition(); break;
         case 'save-automation': saveAutomation(); break;
+        case 'add-webhook-field':
+          e.preventDefault();
+          if (!Array.isArray(state.draft.fields)) state.draft.fields = [];
+          state.draft.fields.push({ key: '', value: '' });
+          state.draft._webhookFocus = { listKey: 'fields', index: state.draft.fields.length - 1, which: 'key' };
+          clearWebhookTestStatus();
+          renderConfigure();
+          break;
+        case 'remove-webhook-field': {
+          const idx = parseInt(target.dataset.rowIndex, 10);
+          if (Array.isArray(state.draft.fields) && state.draft.fields[idx] !== undefined) {
+            state.draft.fields.splice(idx, 1);
+            clearWebhookTestStatus();
+            renderConfigure();
+          }
+          break;
+        }
+        case 'add-webhook-header':
+          e.preventDefault();
+          if (!Array.isArray(state.draft.headers)) state.draft.headers = [];
+          state.draft.headers.push({ key: '', value: '' });
+          state.draft._webhookFocus = { listKey: 'headers', index: state.draft.headers.length - 1, which: 'key' };
+          clearWebhookTestStatus();
+          renderConfigure();
+          break;
+        case 'remove-webhook-header': {
+          const idx = parseInt(target.dataset.rowIndex, 10);
+          if (Array.isArray(state.draft.headers) && state.draft.headers[idx] !== undefined) {
+            state.draft.headers.splice(idx, 1);
+            clearWebhookTestStatus();
+            renderConfigure();
+          }
+          break;
+        }
+        case 'open-webhook-picker':
+          e.preventDefault();
+          e.stopPropagation();
+          openWebhookPicker(target);
+          break;
+        case 'pick-webhook-variable': {
+          e.preventDefault();
+          const listKey = target.dataset.list;
+          const idx     = parseInt(target.dataset.index, 10);
+          const placeholder = target.dataset.placeholder;
+          insertWebhookVariable(listKey, idx, placeholder);
+          break;
+        }
+        case 'webhook-test':
+          e.preventDefault();
+          runWebhookTest();
+          break;
+        case 'webhook-test-details':
+          e.preventDefault();
+          openWebhookTestDetails();
+          break;
+        case 'close-webhook-test-modal':
+          e.preventDefault();
+          closeWebhookTestModal();
+          break;
+        case 'remove-tag': {
+          const tagToRemove = target.dataset.tag;
+          if (!tagToRemove) break;
+          if (Array.isArray(state.draft?.tags)) {
+            state.draft.tags = state.draft.tags.filter(t => t !== tagToRemove);
+            state.draft._tagInputFocused = true;
+            renderConfigure();
+          }
+          break;
+        }
+        case 'suggest-tag': {
+          const t = (target.dataset.tag || '').trim();
+          if (!t || !state.draft) break;
+          const cur = Array.isArray(state.draft.tags) ? state.draft.tags : [];
+          if (!cur.some(existing => existing.toLowerCase() === t.toLowerCase())) {
+            state.draft.tags = cur.concat([t]);
+          }
+          state.draft._tagInputFocused = true;
+          renderConfigure();
+          break;
+        }
         case 'cancel-automation':
           state.draft = null;
           state.editingId = null;
@@ -2159,6 +2681,9 @@
     // Reset
     $('#resetBtn').addEventListener('click', resetAll);
 
+    const bannerCloseBtn = document.getElementById('disambigBannerClose');
+    if (bannerCloseBtn) bannerCloseBtn.addEventListener('click', dismissDisambigBanner);
+
     // Keyboard
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -2200,6 +2725,7 @@
     wireEvents();
     renderTriggersLanding();
     setView('triggers-landing');
+    applyDisambigBannerState();
 
     let seen = false;
     try { seen = localStorage.getItem(GUIDE_SEEN_KEY) === '1'; } catch (_) { /* ignore */ }

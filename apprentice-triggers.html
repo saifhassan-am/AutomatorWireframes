@@ -46,8 +46,17 @@
         <div class="page-header">
           <div>
             <h1 class="page-title">Triggers</h1>
-            <p class="page-subtitle">Wire native Thrive actions to Apprentice events. Tag students in your ESP, send webhooks, start countdowns, or unlock the next course — automatically.</p>
+            <p class="page-subtitle">Run actions automatically when something happens in your courses — tag a student in your email service provider, send a webhook, start an Ultimatum countdown, or unlock the next course.</p>
           </div>
+        </div>
+
+        <!-- Disambiguation banner — clarifies that Triggers fires actions, while Access Restriction Rules gates visibility. Dismissible per-user via localStorage. -->
+        <div class="banner banner--info" id="disambigBanner" role="note">
+          <span class="banner__icon" aria-hidden="true">ⓘ</span>
+          <p class="banner__text">
+            Triggers fire actions when events happen — like tagging someone when they enroll. To control who can <strong>see</strong> content, use <strong>Access restriction rules</strong> on each product.
+          </p>
+          <button class="banner__close" id="disambigBannerClose" aria-label="Dismiss this notice" title="Dismiss">×</button>
         </div>
 
         <div class="trigger-cards" id="triggerCards">
@@ -91,7 +100,7 @@
       <!-- Step A: Scope (Completion only)                -->
       <!-- Step B: Trigger target (cascading dropdowns)   -->
       <!-- Step C: Action picker                          -->
-      <!-- Step C1: Sub-op selector (ESP Tag / Ultimatum) -->
+      <!-- Step C1: Sub-op selector (Ultimatum only)      -->
       <!-- Step D: Configure the action + Timing + Cond   -->
       <!-- Save & Activate footer (always clickable).     -->
       <!-- ============================================= -->
@@ -119,8 +128,8 @@
             <div class="step__head">
               <span class="step__num">1</span>
               <div class="step__head-text">
-                <h3 class="step__title">Fire when student completes a:</h3>
-                <p class="step__sub">Pick the level of completion that should trigger automations.</p>
+                <h3 class="step__title">Run when a student completes a:</h3>
+                <p class="step__sub">Pick the level of completion that should kick off this automation.</p>
               </div>
             </div>
             <div class="step__body">
@@ -189,7 +198,7 @@
         <!-- /stage picker -->
 
         <!-- ============================================= -->
-        <!-- STAGE 2: SUB-OP SELECTOR (ESP Tag, Ultimatum)  -->
+        <!-- STAGE 2: SUB-OP SELECTOR (Ultimatum only)      -->
         <!-- Two big choice cards — clicking IS the choice. -->
         <!-- ============================================= -->
         <div class="stage" data-stage="subop" hidden>
@@ -202,7 +211,7 @@
             <div class="subop__header">
               <span class="subop__header-icon" id="subopHeaderIcon" aria-hidden="true">📩</span>
               <div class="subop__header-body">
-                <h3 class="subop__header-name" id="subopHeaderName">ESP Tag</h3>
+                <h3 class="subop__header-name" id="subopHeaderName">Action</h3>
                 <p class="subop__header-sub" id="subopHeaderSub">What should happen with this user's tag?</p>
               </div>
             </div>
@@ -231,7 +240,7 @@
               <span class="action-pill__icon" id="pillIcon">📩</span>
               <div class="action-pill__body">
                 <div class="action-pill__name" id="pillName">Add tag</div>
-                <div class="action-pill__desc" id="pillDesc">Apply a tag to this user in your ESP</div>
+                <div class="action-pill__desc" id="pillDesc">Apply tags in your connected email service provider</div>
               </div>
               <button class="text-link" data-action="change-action">Change</button>
             </div>
@@ -337,7 +346,7 @@
 
         <div class="drawer__safety">
           <span class="drawer__safety-icon">🛡</span>
-          <span><strong>Test mode</strong> — nothing is written to your ESP, no webhook is sent, no campaign starts, no access changes.</span>
+          <span><strong>Test mode</strong> — nothing is written to your email service provider, no webhook is sent, no campaign starts, no access changes.</span>
         </div>
 
         <div class="drawer__body" id="drawerBody">
@@ -389,6 +398,32 @@
           <button class="btn btn--primary btn--pulse" data-action="run-test">⚡ Run test</button>
         </footer>
       </aside>
+    </div>
+
+    <!-- ====== Webhook test details modal (Leads-parity) ====== -->
+    <div class="modal webhook-test-modal" id="webhookTestModal" hidden>
+      <div class="modal__backdrop" data-action="close-webhook-test-modal"></div>
+      <div class="modal__dialog webhook-test-modal__dialog">
+        <div class="webhook-test-modal__header">
+          <h3 class="modal__title webhook-test-modal__title">Connection details</h3>
+          <button class="webhook-test-modal__close" data-action="close-webhook-test-modal" aria-label="Close">×</button>
+        </div>
+        <div class="webhook-test-modal__alert" hidden>
+          <span aria-hidden="true">⚠</span>
+          <span>Webhook failed to send</span>
+        </div>
+        <div class="webhook-test-modal__kv">
+          <div class="webhook-test-modal__kv-row"><span class="webhook-test-modal__k">Status</span><span class="webhook-test-modal__v" data-test-status>—</span></div>
+          <div class="webhook-test-modal__kv-row"><span class="webhook-test-modal__k">Duration</span><span class="webhook-test-modal__v" data-test-duration>—</span></div>
+          <div class="webhook-test-modal__kv-row"><span class="webhook-test-modal__k">Method</span><span class="webhook-test-modal__v" data-test-method>—</span></div>
+          <div class="webhook-test-modal__kv-row"><span class="webhook-test-modal__k">Endpoint</span><span class="webhook-test-modal__v webhook-test-modal__v--mono" data-test-endpoint>—</span></div>
+          <div class="webhook-test-modal__kv-row webhook-test-modal__kv-row--err" data-test-error-row hidden><span class="webhook-test-modal__k">Error</span><span class="webhook-test-modal__v" data-test-error>—</span></div>
+        </div>
+        <div class="webhook-test-modal__response">
+          <div class="webhook-test-modal__response-title">Server response</div>
+          <pre class="webhook-test-modal__body" data-test-body></pre>
+        </div>
+      </div>
     </div>
 
     <!-- ====== Remove confirmation modal ====== -->
