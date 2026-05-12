@@ -18,6 +18,12 @@
       --apprentice-light: #ffe8d6;
       --architect: #2980b9;
       --architect-light: #d6eaf8;
+      --quiz: #27ae60;
+      --quiz-light: #d4efdf;
+      --ultimatum: #c0392b;
+      --ultimatum-light: #fadbd8;
+      --ovation: #1abc9c;
+      --ovation-light: #d1f2eb;
       --success: #27ae60;
       --radius: 8px;
       --radius-lg: 12px;
@@ -142,6 +148,9 @@
     }
     .proto--apprentice { border-left-color: var(--apprentice); }
     .proto--architect { border-left-color: var(--architect); }
+    .proto--quiz { border-left-color: var(--quiz); }
+    .proto--ultimatum { border-left-color: var(--ultimatum); }
+    .proto--ovation { border-left-color: var(--ovation); }
 
     .proto__head {
       display: flex;
@@ -166,6 +175,18 @@
     .proto--architect .proto__icon {
       background: var(--architect-light);
       color: var(--architect);
+    }
+    .proto--quiz .proto__icon {
+      background: var(--quiz-light);
+      color: var(--quiz);
+    }
+    .proto--ultimatum .proto__icon {
+      background: var(--ultimatum-light);
+      color: var(--ultimatum);
+    }
+    .proto--ovation .proto__icon {
+      background: var(--ovation-light);
+      color: var(--ovation);
     }
     .proto__pill {
       display: inline-block;
@@ -347,6 +368,94 @@
           <li>Stacking validation — max one of each compatible action per scope</li>
           <li>Course-grouped automation list with per-group quick-add</li>
           <li>Cascading Course → Module → Lesson targeting for completion + drip</li>
+        </ul>
+        <span class="proto__cta">Open prototype <span class="proto__cta-arrow">→</span></span>
+      </a>
+
+      <a class="proto proto--architect" href="form-engine-v2.html">
+        <div class="proto__head">
+          <div class="proto__icon">🔌</div>
+          <div>
+            <span class="proto__pill">Features 7 + 8 · P2</span>
+            <h2 class="proto__title">[Architect] Form Engine v2 — Multi-Connection + External Submit</h2>
+            <div class="proto__tag">Combines 2 Phase-2 features · ~1.4K Automator recipes covered (~412K runs)</div>
+          </div>
+        </div>
+        <p class="proto__desc">
+          Form Connection panel goes from single-slot to multi-instance — multiple autoresponders, multiple webhooks, multiple Thrive Actions per form. Plus an External Submit toggle generates a per-form REST endpoint so Zapier, ThriveCart, and partner systems can fire any form's connections.
+        </p>
+        <ul class="proto__bullets">
+          <li>Per-section "+ Add connection" — N of each connection type per form</li>
+          <li>External Submit endpoint with Shared-secret authentication option</li>
+          <li>Field mapping (incoming JSON keys → form fields), reuses Webhook tab pattern</li>
+          <li>Send test on the endpoint shows simulated response in the same Test Details modal as Webhooks</li>
+          <li>Failures isolated per connection — one failing won't block the others</li>
+        </ul>
+        <span class="proto__cta">Open prototype <span class="proto__cta-arrow">→</span></span>
+      </a>
+
+      <a class="proto proto--ovation" href="ovation-notifications.html">
+        <div class="proto__head">
+          <div class="proto__icon">📨</div>
+          <div>
+            <span class="proto__pill">Feature 14 · P3</span>
+            <h2 class="proto__title">[Ovation] Admin Notifications on Testimonial Events</h2>
+            <div class="proto__tag">The "why isn't this built in?" feature · table-stakes UX gap</div>
+          </div>
+        </div>
+        <p class="proto__desc">
+          A new Notifications card in Ovation Settings. Two toggleable email notifications: one to admins on submission (with one-click Approve/Reject buttons), one to submitters on approval. Plain <code>wp_mail()</code> — no ESP, no webhook, no automation primitives. The smallest of the four remaining features.
+        </p>
+        <ul class="proto__bullets">
+          <li>Toggle-based notifications with collapsible config rows</li>
+          <li>Recipients chip input + customizable subject + body templates</li>
+          <li>Merge-tag helper buttons that insert at the cursor</li>
+          <li>One-click signed-link Approve / Reject with 48-hour expiry</li>
+          <li>Live preview that re-renders as you type</li>
+        </ul>
+        <span class="proto__cta">Open prototype <span class="proto__cta-arrow">→</span></span>
+      </a>
+
+      <a class="proto proto--ultimatum" href="ultimatum-lifecycle.html">
+        <div class="proto__head">
+          <div class="proto__icon">⏱</div>
+          <div>
+            <span class="proto__pill">Features 10 + 12 · P2 + P3</span>
+            <h2 class="proto__title">[Ultimatum] Campaign Lifecycle Events</h2>
+            <div class="proto__tag">Combines 2 Phase-2 features · Evergreen-only</div>
+          </div>
+        </div>
+        <p class="proto__desc">
+          Two new cards in Ultimatum's Campaign Settings — <strong>Trigger Sources</strong> (incoming webhook → start the countdown for a user) and <strong>Expiry Actions</strong> (when the countdown hits zero unconverted, fire actions). Bridges Ultimatum to ConvertKit, ThriveCart, partner systems without Automator.
+        </p>
+        <ul class="proto__bullets">
+          <li>Trigger Sources radio: Page Visit (default) / Incoming Webhook / Leads Conversion / First Visit / Promotion</li>
+          <li>Per-campaign REST endpoint with Shared-secret auth + Send test</li>
+          <li>"Connected products" section auto-detects which Thrive products fire this campaign</li>
+          <li>Expiry Actions reuse the #3566 picker — Email tag (multi-tag) or Send Webhook (Leads-parity)</li>
+          <li>Cards hidden / disabled on Rolling and Fixed-Date campaigns (Evergreen-only by design)</li>
+        </ul>
+        <span class="proto__cta">Open prototype <span class="proto__cta-arrow">→</span></span>
+      </a>
+
+      <a class="proto proto--quiz" href="quiz-result-actions.html">
+        <div class="proto__head">
+          <div class="proto__icon">🏅</div>
+          <div>
+            <span class="proto__pill">Feature 6 · P1</span>
+            <h2 class="proto__title">[Quiz Builder] Quiz Triggers</h2>
+            <div class="proto__tag">Replaces ~11K Quiz-completed Automator recipes (~12M runs)</div>
+          </div>
+        </div>
+        <p class="proto__desc">
+          A new Quiz Triggers dashboard inside Quiz Builder. Add the quizzes you want to set up, attach actions to each outcome (score range, Pass/Fail, personality result, or On completion) — tag in your email tool, send a webhook, start an Ultimatum countdown, or grant Apprentice access. Same picker pattern + sub-op flow as Apprentice Triggers.
+        </p>
+        <ul class="proto__bullets">
+          <li>Dashboard entry — only the quizzes you've added; Active / Partial setup / Disabled status pills</li>
+          <li>Type-adaptive setup across all 5 quiz types (Number / Percentage / Right-Wrong / Personality / Survey)</li>
+          <li>Hybrid range slider with ghost zones, drag-snap, and quick-fill chips (no hardcoded 100-point cap)</li>
+          <li>Same four-action picker + stacking rules as Apprentice Triggers — consistent UX across products</li>
+          <li>Per-quiz Active/Disable toggle · per-action paused state · soft-delete with undo</li>
         </ul>
         <span class="proto__cta">Open prototype <span class="proto__cta-arrow">→</span></span>
       </a>

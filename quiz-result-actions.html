@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Quiz Triggers — Phase 2 prototype</title>
+<link rel="stylesheet" href="quiz-result-actions.css" />
+</head>
+<body data-theme="light">
+
+<header class="app-chrome" role="banner">
+  <div class="chrome-inner">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="#" data-action="go-list">Thrive Dashboard</a>
+      <span aria-hidden="true">›</span>
+      <a href="#" data-action="go-list">Quiz Builder</a>
+      <span aria-hidden="true">›</span>
+      <span id="bcMidGroup">
+        <button class="bc-quiz" id="bcQuizPicker" aria-haspopup="listbox" aria-expanded="false" hidden>
+          <span id="bcQuizName">Photography 101</span>
+          <span class="caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="bc-sep" aria-hidden="true" hidden id="bcMidSep">›</span>
+        <a href="#" hidden id="bcSettings">Settings</a>
+        <span class="bc-sep" aria-hidden="true" hidden id="bcMidSep2">›</span>
+      </span>
+      <strong>Quiz Triggers</strong>
+    </nav>
+    <div class="chrome-tools">
+      <button id="resetDemo" class="chrome-btn" title="Reset prototype state">↻ Reset</button>
+    </div>
+  </div>
+</header>
+
+<div id="quizPickerSheet" class="quiz-picker" role="dialog" aria-modal="true" aria-labelledby="qpTitle" hidden>
+  <div class="qp-panel">
+    <header class="qp-header">
+      <h2 id="qpTitle">Pick a quiz to view</h2>
+      <p class="qp-sub">Each quiz demonstrates a different quiz type and how the UI adapts.</p>
+      <button class="qp-close" id="qpClose" aria-label="Close">×</button>
+    </header>
+    <ul class="qp-list" id="qpList" role="listbox" aria-label="Quizzes"></ul>
+  </div>
+  <div class="qp-scrim" id="qpScrim"></div>
+</div>
+
+<main class="surface" id="surface" data-view="landing">
+
+  <!-- =================================================================
+       VIEW 1 — Quiz list (the actual entry point)
+  ================================================================== -->
+  <section class="quiz-list-view" id="quizListView">
+    <header class="list-view-header">
+      <h1 class="page-title">Quiz Triggers</h1>
+      <p class="page-subtitle">Run actions automatically when someone completes a quiz — tag them in your email service provider, send a webhook, start an Ultimatum countdown, or grant Apprentice access.</p>
+    </header>
+
+    <div class="banner-info" id="chooserBanner" role="note">
+      <span class="banner-info__icon" aria-hidden="true">ⓘ</span>
+      <p class="banner-info__text">Quiz Triggers fire <strong>once when someone completes a quiz</strong>, based on their overall result. If you want to tag people based on individual answers they pick, use <a href="#" data-action="open-tagged-answers">Tagged Answers</a> instead.</p>
+      <button class="banner-info__close" data-action="dismiss-banner" aria-label="Dismiss">×</button>
+    </div>
+
+    <!-- EMPTY STATE — shown when no quizzes are on the dashboard yet -->
+    <div class="dashboard-empty" id="dashboardEmpty" hidden>
+      <div class="dashboard-empty__icon" aria-hidden="true">🎯</div>
+      <h2 class="dashboard-empty__title">Let's set up your first Quiz Trigger</h2>
+      <p class="dashboard-empty__sub">Pick a quiz below and we'll add it to your dashboard so you can configure what fires when someone completes it.</p>
+      <div class="quiz-chooser__combo dashboard-empty__combo" id="quizComboBox">
+        <span class="quiz-chooser__search-icon" aria-hidden="true">🔍</span>
+        <input type="text" id="quizComboInput" placeholder="Start typing or click to browse all your quizzes…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="chooserResults" aria-autocomplete="list" />
+        <button class="quiz-chooser__clear" id="quizComboClear" type="button" aria-label="Clear" hidden>×</button>
+        <ul class="chooser-results" id="chooserResults" role="listbox" hidden></ul>
+      </div>
+    </div>
+
+    <!-- POPULATED STATE — list of quizzes user is setting up -->
+    <div class="dashboard-populated" id="dashboardPopulated" hidden>
+      <div class="dashboard-head">
+        <div class="dashboard-head__text">
+          <h2 class="dashboard-head__title">Quiz triggers you're setting up</h2>
+          <p class="dashboard-head__sub" id="dashboardHeadSub">3 quizzes</p>
+        </div>
+        <button class="btn btn--primary" id="addQuizBtn" data-action="toggle-add-picker">
+          <span aria-hidden="true">+</span> Add a quiz
+        </button>
+      </div>
+
+      <!-- Collapsible picker shown when user clicks "+ Add a quiz" -->
+      <div class="add-picker" id="addPicker" hidden>
+        <div class="add-picker__head">
+          <span class="add-picker__icon" aria-hidden="true">🔍</span>
+          <h3 class="add-picker__title">Pick a quiz to add</h3>
+          <button class="add-picker__close" data-action="close-add-picker" aria-label="Close">×</button>
+        </div>
+        <div class="quiz-chooser__combo add-picker__combo" id="addQuizComboBox">
+          <span class="quiz-chooser__search-icon" aria-hidden="true">🔍</span>
+          <input type="text" id="addQuizComboInput" placeholder="Start typing or browse below…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="addQuizComboResults" aria-autocomplete="list" />
+          <button class="quiz-chooser__clear" id="addQuizComboClear" type="button" aria-label="Clear" hidden>×</button>
+          <ul class="chooser-results add-picker__results" id="addQuizComboResults" role="listbox" hidden></ul>
+        </div>
+      </div>
+
+      <!-- Dashboard list of quizzes -->
+      <ul class="dashboard-list" id="dashboardList"></ul>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       VIEW 2 — Per-quiz Quiz Triggers setup (the existing UI)
+  ================================================================== -->
+  <div class="quiz-settings-view" id="quizSettingsView" hidden>
+
+  <div class="quiz-back-row">
+    <button class="text-link text-link--muted back-link" data-action="go-list">‹ Back to Quiz Triggers</button>
+  </div>
+
+  <section class="quiz-header" aria-labelledby="qhTitle">
+    <div class="qh-row">
+      <h1 id="qhTitle">Photography 101</h1>
+      <div class="qh-chips">
+        <span class="type-chip" id="typeChip">
+          <span class="chip-icon" aria-hidden="true">🔢</span>
+          <span class="chip-text">Number score</span>
+        </span>
+        <span class="status-pill" id="quizStatusPill" hidden></span>
+      </div>
+    </div>
+    <p class="qh-readout" id="qhReadout">Total possible: 300 points · 12 questions</p>
+  </section>
+
+  <div class="banner banner--danger" id="disabledBanner" role="note" hidden>
+    <span class="banner-body">
+      <strong>Triggers for this quiz are turned off.</strong>
+      New quiz completions won't fire any actions until you re-enable them.
+    </span>
+    <button class="btn btn--primary btn--sm" data-action="activate-from-banner">▶ Activate triggers</button>
+  </div>
+
+  <div class="banner" id="disambigBanner" role="note">
+    <div class="banner-body">
+      <strong>Quiz Triggers fire once when someone completes the quiz</strong>, based on their overall result.
+      <br />
+      To tag users based on individual answers they picked, use
+      <a href="#" data-action="open-tagged-answers">Tagged Answers</a>.
+    </div>
+    <button class="banner-close" data-action="dismiss-banner" aria-label="Dismiss">×</button>
+  </div>
+
+  <section class="landing" id="landingView">
+
+    <div class="layout layout-score" data-layout="score" hidden>
+      <div class="score-map" aria-label="Score map showing your ranges across the quiz's total range">
+        <div class="map-axis">
+          <span class="map-axis-start" id="mapAxisStart">0</span>
+          <span class="map-axis-end" id="mapAxisEnd">300</span>
+        </div>
+        <div class="map-track" id="mapTrack"></div>
+        <div class="map-legend">
+          <span class="legend-item"><span class="legend-swatch"></span> Range</span>
+          <span class="legend-item"><span class="legend-swatch legend-swatch-gap"></span> Gap (no actions)</span>
+        </div>
+      </div>
+
+      <div class="list-header">
+        <h2 class="list-title">Score ranges</h2>
+        <button class="btn-primary" id="addRangeBtn">+ Add range</button>
+      </div>
+
+      <div class="empty-starter" id="emptyStarter" hidden>
+        <p class="empty-title">No ranges yet — pick a starting point.</p>
+        <div class="starter-grid">
+          <button class="starter-card" data-starter="passfail">
+            <span class="starter-icon" aria-hidden="true">✓✗</span>
+            <span class="starter-name">Pass / Fail</span>
+            <span class="starter-desc">A single threshold splits scorers into two buckets.</span>
+          </button>
+          <button class="starter-card" data-starter="three-tier">
+            <span class="starter-icon" aria-hidden="true">▮▮▮</span>
+            <span class="starter-name">3-tier</span>
+            <span class="starter-desc">Low / Mid / High evenly across the quiz's range.</span>
+          </button>
+          <button class="starter-card" data-starter="blank">
+            <span class="starter-icon" aria-hidden="true">＋</span>
+            <span class="starter-name">Start blank</span>
+            <span class="starter-desc">Define your own ranges from scratch.</span>
+          </button>
+        </div>
+      </div>
+
+      <ul class="bucket-list" id="bucketListScore"></ul>
+    </div>
+
+    <div class="layout layout-rightwrong" data-layout="rightwrong" hidden>
+      <div class="pass-rule-chip" id="passRuleChip">
+        <span class="prc-icon" aria-hidden="true">ℹ</span>
+        <span id="passRuleText">This quiz passes when all questions are correct.</span>
+      </div>
+      <ul class="bucket-list bucket-list-fixed" id="bucketListRightWrong"></ul>
+    </div>
+
+    <div class="layout layout-personality" data-layout="personality" hidden>
+      <div class="list-header">
+        <h2 class="list-title">Personality results</h2>
+        <span class="muted-hint">Result labels are set in <a href="#" data-action="open-quiz-builder">the quiz builder</a>. Edit them there.</span>
+      </div>
+      <ul class="bucket-list" id="bucketListPersonality"></ul>
+    </div>
+
+    <div class="layout layout-survey" data-layout="survey" hidden>
+      <div class="pass-rule-chip" id="surveyRuleChip">
+        <span class="prc-icon" aria-hidden="true">ℹ</span>
+        <span>Survey related triggers fire for every user who completes the survey, regardless of which answer they picked.</span>
+      </div>
+      <ul class="bucket-list bucket-list-fixed" id="bucketListSurvey"></ul>
+    </div>
+
+  </section>
+
+  <section class="action-flow" id="actionFlowView" hidden>
+    <div class="edit-header">
+      <button class="text-link text-link--muted back-link" data-action="back-to-landing">‹ Back to ranges</button>
+    </div>
+
+    <div class="edit-title-row">
+      <div class="edit-title-row__heading">
+        <h1 class="edit-title-row__title" id="editTitle">New action</h1>
+        <p class="edit-title-row__sub" id="editSub">Configure what happens when a user's quiz result lands in this range.</p>
+      </div>
+    </div>
+
+    <div class="stage stage-picker" data-stage="picker">
+      <div class="trigger-context" id="pickerContext">
+        <span class="trigger-context__icon" aria-hidden="true">🎯</span>
+        <span class="trigger-context__text" id="pickerContextText">On <strong>quiz completion</strong></span>
+      </div>
+      <section class="step">
+        <div class="step__head">
+          <span class="step__num">1</span>
+          <div class="step__head-text">
+            <h3 class="step__title">Pick the action</h3>
+            <p class="step__sub">Choose what should happen when someone lands in this range.</p>
+          </div>
+        </div>
+        <div class="step__body">
+          <p class="picker__filter-note" id="pickerHelp" hidden></p>
+          <div class="picker__list" id="actionPickerGrid"></div>
+        </div>
+      </section>
+      <section class="step step--upcoming" aria-hidden="true">
+        <div class="step__head">
+          <span class="step__num step__num--upcoming">2</span>
+          <div class="step__head-text">
+            <h3 class="step__title">Configure</h3>
+            <p class="step__sub">Fill in the action-specific fields (and optional Timing or Condition).</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="stage stage-subop" data-stage="subop" hidden>
+      <div class="subop">
+        <div class="subop__back">
+          <button class="text-link subop__back-link" data-action="change-action">
+            <span aria-hidden="true">←</span> Back to actions
+          </button>
+        </div>
+        <div class="subop__header">
+          <span class="subop__header-icon subop__header-icon--ultimatum" aria-hidden="true">⏱</span>
+          <div class="subop__header-body">
+            <h3 class="subop__header-name">Ultimatum Campaign</h3>
+            <p class="subop__header-sub">Start or stop a countdown for this user when they land in this range.</p>
+          </div>
+        </div>
+        <div class="subop__list">
+          <button class="subop-card subop-card--ultimatum" data-subop="start">
+            <span class="subop-card__icon" aria-hidden="true">▶</span>
+            <span class="subop-card__body">
+              <div class="subop-card__name">Start campaign</div>
+              <div class="subop-card__desc">Begin an Ultimatum countdown for this user.</div>
+            </span>
+            <span class="subop-card__chevron" aria-hidden="true">›</span>
+          </button>
+          <button class="subop-card subop-card--ultimatum" data-subop="stop">
+            <span class="subop-card__icon" aria-hidden="true">■</span>
+            <span class="subop-card__body">
+              <div class="subop-card__name">Stop campaign</div>
+              <div class="subop-card__desc">End an in-progress countdown for this user.</div>
+            </span>
+            <span class="subop-card__chevron" aria-hidden="true">›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage stage-configure" data-stage="configure" hidden>
+      <div class="configure">
+
+        <div class="trigger-context" id="triggerContext">
+          <span class="trigger-context__icon" aria-hidden="true">🎯</span>
+          <span class="trigger-context__text" id="triggerContextText">On <strong>quiz completion</strong> · <strong>Photography 101</strong> · Range <strong>Beginner (0–80 pts)</strong></span>
+        </div>
+
+        <div class="action-pill" id="actionPill">
+          <span class="action-pill__icon action-pill__icon--esp" id="actionPillIcon" aria-hidden="true">📩</span>
+          <div class="action-pill__body">
+            <div class="action-pill__name" id="actionPillName">Email tag</div>
+            <div class="action-pill__desc" id="actionPillDesc">Apply tags in your connected email service provider.</div>
+          </div>
+          <button class="text-link" data-action="change-action">Change</button>
+        </div>
+
+        <div class="configure__section" id="configureBody"></div>
+
+        <div class="timing" id="timingBlock">
+          <div class="timing__collapsed" id="timingCollapsed">
+            <button class="text-link text-link--primary" data-action="add-delay">+ Add a delay</button>
+            <span class="timing__hint">fires immediately by default</span>
+          </div>
+          <div class="timing__expanded" id="timingExpanded" hidden>
+            <div class="timing__label">When should this fire?</div>
+            <div class="timing__row">
+              <span class="timing__kw">FIRE</span>
+              <input type="number" class="input input--sm timing__num" id="timingValue" min="1" value="1" aria-label="Delay amount">
+              <div class="select-wrap">
+                <select class="input input--select input--sm" id="timingUnit" aria-label="Delay unit">
+                  <option value="minutes">minutes</option>
+                  <option value="hours">hours</option>
+                  <option value="days" selected>days</option>
+                  <option value="weeks">weeks</option>
+                  <option value="months">months</option>
+                </select>
+              </div>
+              <span class="timing__suffix">after quiz completion</span>
+            </div>
+            <button class="text-link text-link--muted" data-action="remove-delay">Remove delay</button>
+          </div>
+        </div>
+
+        <div class="condition" id="conditionBlock">
+          <div class="condition__collapsed" id="conditionCollapsed">
+            <button class="text-link text-link--primary" data-action="add-condition">+ Add a condition</button>
+            <span class="condition__hint">always runs by default — add a rule to filter by a field value</span>
+          </div>
+          <div class="condition__expanded" id="conditionExpanded" hidden>
+            <div class="condition__label">Only fire this action if…</div>
+            <div class="condition__row">
+              <span class="condition__kw">IF</span>
+              <div class="select-wrap">
+                <select class="input input--select input--sm" id="conditionField">
+                  <option>email</option>
+                  <option>name</option>
+                  <option>result</option>
+                  <option>bucket_label</option>
+                </select>
+              </div>
+              <div class="select-wrap">
+                <select class="input input--select input--sm" id="conditionOp">
+                  <option value="equals">equals</option>
+                  <option value="not_equals">does not equal</option>
+                  <option value="contains">contains</option>
+                </select>
+              </div>
+              <input type="text" class="input input--sm" id="conditionValue" placeholder="value" />
+            </div>
+            <div class="condition__then">
+              <span class="condition__kw">THEN</span>
+              <span class="condition__then-text">fire the action</span>
+            </div>
+            <button class="text-link text-link--muted" data-action="remove-condition">Remove condition</button>
+          </div>
+        </div>
+
+        <div class="configure__cta">
+          <button class="btn btn--primary btn--xl" id="saveActionBtn">Save &amp; Activate</button>
+          <button class="text-link text-link--muted" data-action="back-to-landing">Cancel</button>
+        </div>
+
+      </div>
+    </div>
+
+  </section>
+
+  </div><!-- /quizSettingsView -->
+
+</main>
+
+<div class="toast-rail" id="toastRail" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Dashboard card popover — items rendered by JS based on each quiz's state -->
+<div class="popover" id="cardPopover" hidden></div>
+
+<div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+  <div class="modal-panel">
+    <h2 id="confirmTitle">Remove this action?</h2>
+    <p id="confirmBody">It will stop firing on new quiz completions. You can re-add it later.</p>
+    <footer class="modal-footer">
+      <button class="btn-ghost" data-action="cancel-confirm">Keep action</button>
+      <button class="btn-danger" id="confirmRemoveBtn">Remove action</button>
+    </footer>
+  </div>
+  <div class="modal-scrim" data-action="cancel-confirm"></div>
+</div>
+
+<script src="quiz-result-actions.js"></script>
+</body>
+</html>
