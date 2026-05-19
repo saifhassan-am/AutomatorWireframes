@@ -421,19 +421,19 @@
           <div class="proto__icon">⏱</div>
           <div>
             <span class="proto__pill">Features 10 + 12 · P2 + P3</span>
-            <h2 class="proto__title">[Ultimatum] Campaign Lifecycle Events</h2>
+            <h2 class="proto__title">[Ultimatum] Ultimatum Triggers</h2>
             <div class="proto__tag">Combines 2 Phase-2 features · Evergreen-only</div>
           </div>
         </div>
         <p class="proto__desc">
-          Two new cards in Ultimatum's Campaign Settings — <strong>Trigger Sources</strong> (incoming webhook → start the countdown for a user) and <strong>Expiry Actions</strong> (when the countdown hits zero unconverted, fire actions). Bridges Ultimatum to ConvertKit, ThriveCart, partner systems without Automator.
+          A new top-level Ultimatum Triggers admin. Curated dashboard of the campaigns you've wired up, per-campaign page with two inline cards: <strong>Trigger Sources</strong> (incoming webhook, Page Visit, or Leads form starts the countdown for a user) and <strong>Expiry Actions</strong> (when the countdown hits zero unconverted, fire actions). Bridges Ultimatum to ConvertKit, Stripe, partner systems without Automator.
         </p>
         <ul class="proto__bullets">
-          <li>Trigger Sources radio: Page Visit (default) / Incoming Webhook / Leads Conversion / First Visit / Promotion</li>
-          <li>Per-campaign REST endpoint with Shared-secret auth + Send test</li>
-          <li>"Connected products" section auto-detects which Thrive products fire this campaign</li>
-          <li>Expiry Actions reuse the #3566 picker — Email tag (multi-tag) or Send Webhook (Leads-parity)</li>
-          <li>Cards hidden / disabled on Rolling and Fixed-Date campaigns (Evergreen-only by design)</li>
+          <li>Trigger Sources picker: Page Visit / Incoming Webhook / Thrive Leads Form Conversion (multi-instance, one of each per campaign)</li>
+          <li>Incoming Webhook auth: Connection Card (endpoint URL + header name + signing secret) with collapsed Advanced security (None / Shared Secret / HMAC-SHA256) + rate limit</li>
+          <li>Expiry Actions picker: Email tag (multi-tag) or Send Webhook with full token picker (6 expiry-context tokens) + Send test</li>
+          <li>Status pill taxonomy: Active / Partial setup / Needs setup / Disabled, with per-card 3-dot popover + soft delete</li>
+          <li>Non-Evergreen campaigns get an explainer card instead of empty trigger surfaces (Evergreen-only by design)</li>
         </ul>
         <span class="proto__cta">Open prototype <span class="proto__cta-arrow">→</span></span>
       </a>

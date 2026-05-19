@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Ultimatum Triggers — Phase 2 prototype</title>
+<link rel="stylesheet" href="ultimatum-lifecycle.css" />
+</head>
+<body>
+
+<header class="app-chrome" role="banner">
+  <div class="chrome-inner">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="#" data-action="go-list">Thrive Dashboard</a>
+      <span aria-hidden="true">›</span>
+      <a href="#" data-action="go-list">Thrive Ultimatum</a>
+      <span aria-hidden="true">›</span>
+      <span id="bcMidGroup">
+        <span class="bc-name" id="bcCampaignName" hidden></span>
+        <span class="bc-sep" aria-hidden="true" id="bcMidSep" hidden>›</span>
+      </span>
+      <strong>Triggers</strong>
+    </nav>
+    <div class="chrome-tools">
+      <button id="resetDemo" class="chrome-btn" title="Reset prototype state">↻ Reset</button>
+    </div>
+  </div>
+</header>
+
+<main class="surface" id="surface">
+
+  <!-- =================================================================
+       VIEW 1 — Campaigns dashboard
+  ================================================================== -->
+  <section id="dashboardView" class="view">
+    <header class="page-header">
+      <h1 class="page-title">Ultimatum Triggers</h1>
+      <p class="page-subtitle">Set up how your countdown campaigns start for each user, and what fires when someone's countdown ends without converting.</p>
+    </header>
+
+    <div class="banner banner-info" id="evergreenBanner" role="note">
+      <span class="banner-icon" aria-hidden="true">ⓘ</span>
+      <p class="banner-text"><strong>Triggers are for Evergreen campaigns.</strong> Fixed-date and Recurring campaigns run on a shared clock, so they have no per-user start or expiry to attach actions to. We surface them on this dashboard for visibility, but the trigger setup is greyed out for those types — open one to see why.</p>
+      <button class="banner-close" data-action="dismiss-banner" aria-label="Dismiss">×</button>
+    </div>
+
+    <!-- Empty state -->
+    <div class="dashboard-empty" id="dashboardEmpty" hidden>
+      <div class="dashboard-empty__icon" aria-hidden="true">⏱</div>
+      <h2 class="dashboard-empty__title">Let's set up your first campaign trigger</h2>
+      <p class="dashboard-empty__sub">Pick an Ultimatum campaign below to start configuring how it triggers and what fires when a user's countdown ends.</p>
+      <div class="combo" id="emptyCombo">
+        <span class="combo-icon" aria-hidden="true">🔍</span>
+        <input type="text" id="emptyComboInput" placeholder="Start typing the campaign name, or click to browse…" autocomplete="off" />
+        <ul class="combo-results" id="emptyComboResults" hidden></ul>
+      </div>
+    </div>
+
+    <!-- Populated state -->
+    <div class="dashboard-populated" id="dashboardPopulated" hidden>
+      <div class="dashboard-head">
+        <div class="dashboard-head__text">
+          <h2 class="dashboard-head__title">Campaign triggers you're setting up</h2>
+          <p class="dashboard-head__sub" id="dashboardHeadSub">0 campaigns</p>
+        </div>
+        <button class="btn btn--primary" id="addCampaignBtn" data-action="toggle-add-picker">
+          <span aria-hidden="true">+</span> Add a campaign
+        </button>
+      </div>
+
+      <!-- Inline add-picker (collapsible) -->
+      <div class="add-picker" id="addPicker" hidden>
+        <div class="add-picker__head">
+          <span class="add-picker__icon" aria-hidden="true">🔍</span>
+          <h3 class="add-picker__title">Pick a campaign to add</h3>
+          <button class="add-picker__close" data-action="close-add-picker" aria-label="Close">×</button>
+        </div>
+        <div class="combo" id="addCombo">
+          <span class="combo-icon" aria-hidden="true">🔍</span>
+          <input type="text" id="addComboInput" placeholder="Start typing the campaign name…" autocomplete="off" />
+          <ul class="combo-results" id="addComboResults" hidden></ul>
+        </div>
+      </div>
+
+      <ul class="dashboard-list" id="dashboardList"></ul>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       VIEW 2 — Per-campaign view
+  ================================================================== -->
+  <section id="campaignView" class="view" hidden>
+    <div class="back-row">
+      <button class="text-link text-link--muted" data-action="go-list">‹ Back to Ultimatum Triggers</button>
+    </div>
+
+    <header class="campaign-header" aria-labelledby="cmpTitle">
+      <div class="cmp-row">
+        <h1 id="cmpTitle" class="cmp-title">Campaign name</h1>
+        <div class="cmp-chips">
+          <span class="type-chip" id="cmpTypeChip">
+            <span class="chip-icon" aria-hidden="true">♾</span>
+            <span class="chip-text">Evergreen</span>
+          </span>
+          <span class="status-pill" id="cmpStatusPill" hidden></span>
+        </div>
+      </div>
+      <p class="cmp-readout" id="cmpReadout">Per-user 72-hour countdown · 1,247 users in flight</p>
+    </header>
+
+    <!-- Banner shown only when the campaign's triggers are disabled (per-quiz pattern) -->
+    <div class="banner banner-danger" id="disabledBanner" role="note" hidden>
+      <span class="banner-body">
+        <strong>Triggers are paused for this campaign.</strong>
+        The countdown still runs normally for users — but no actions fire on expiry, and the incoming webhook stops accepting new starts.
+      </span>
+      <button class="btn btn--primary btn--sm" data-action="activate-from-banner">▶ Activate triggers</button>
+    </div>
+
+    <!-- Non-Evergreen explainer card -->
+    <div id="nonEvergreenExplainer" class="explainer-card" hidden>
+      <div class="explainer-icon" aria-hidden="true">📅</div>
+      <h2 class="explainer-title">Triggers are for Evergreen campaigns only</h2>
+      <p class="explainer-body" id="nonEvergreenWhy">This campaign runs on a shared clock — when the deadline arrives, it arrives for everyone simultaneously. There's no per-user start moment to wire a trigger source to, and no per-user expiry moment to fire actions on.</p>
+      <p class="explainer-body">If you need follow-up actions when this campaign ends, segment non-buyers in your email marketing tool — it's the natural home for "people who saw this and didn't buy" workflows.</p>
+      <div class="explainer-meta">
+        <strong>Want to use Triggers with this campaign?</strong> Switch its type to <em>Evergreen</em> in Campaign Settings. That gives each user their own personal countdown, which Triggers can attach to.
+      </div>
+    </div>
+
+    <!-- Evergreen body — Trigger Sources + Expiry Actions -->
+    <div id="evergreenBody" hidden>
+
+      <!-- ── Section A: Trigger Sources ── -->
+      <section class="cmp-section">
+        <div class="cmp-section__head">
+          <div class="cmp-section__text">
+            <h2 class="cmp-section__title">Trigger Sources</h2>
+            <p class="cmp-section__sub">What event starts this campaign for a user. The default is their first visit to the offer page — add more sources to start the countdown from external systems.</p>
+          </div>
+        </div>
+        <ul class="source-list" id="sourceList"></ul>
+        <button class="add-btn" data-action="add-source">+ Add a trigger source</button>
+      </section>
+
+      <!-- ── Section B: Expiry Actions ── -->
+      <section class="cmp-section">
+        <div class="cmp-section__head">
+          <div class="cmp-section__text">
+            <h2 class="cmp-section__title">Expiry Actions</h2>
+            <p class="cmp-section__sub">What fires when a user's countdown ends without them converting. Useful for follow-up tagging and winback nurture sequences.</p>
+          </div>
+        </div>
+        <ul class="action-list" id="actionList"></ul>
+        <button class="add-btn" data-action="add-action">+ Add an expiry action</button>
+      </section>
+
+    </div>
+  </section>
+
+  <!-- =================================================================
+       VIEW 3 — Action flow (Add / edit an Expiry Action)
+  ================================================================== -->
+  <section id="actionFlowView" class="view" hidden>
+    <div class="back-row">
+      <button class="text-link text-link--muted" data-action="back-to-campaign">‹ Back to campaign</button>
+    </div>
+
+    <div class="edit-title-row">
+      <h1 class="edit-title-row__title" id="actionEditTitle">New expiry action</h1>
+      <p class="edit-title-row__sub">Fire this when a user's countdown ends without converting.</p>
+    </div>
+
+    <!-- Stage 1: pick action -->
+    <div class="stage stage-picker" data-stage="picker">
+      <div class="trigger-context" id="actionContext">
+        <span class="trigger-context__icon" aria-hidden="true">🎯</span>
+        <span class="trigger-context__text" id="actionContextText">On <strong>campaign expiry without conversion</strong></span>
+      </div>
+
+      <section class="step">
+        <div class="step__head">
+          <span class="step__num">1</span>
+          <div class="step__head-text">
+            <h3 class="step__title">Pick the action</h3>
+            <p class="step__sub">Two action types are available on expiry. Ultimatum-start would loop, and Apprentice grant is rare for this context — so we keep this surface tight.</p>
+          </div>
+        </div>
+        <div class="step__body">
+          <div class="picker__list" id="actionPicker"></div>
+        </div>
+      </section>
+
+      <section class="step step--upcoming" aria-hidden="true">
+        <div class="step__head">
+          <span class="step__num step__num--upcoming">2</span>
+          <div class="step__head-text">
+            <h3 class="step__title">Configure</h3>
+            <p class="step__sub">Fill in the action-specific fields (and optional Timing + Condition).</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Stage 2: configure -->
+    <div class="stage stage-configure" data-stage="configure" hidden>
+      <div class="trigger-context">
+        <span class="trigger-context__icon" aria-hidden="true">🎯</span>
+        <span class="trigger-context__text" id="configContextText">On <strong>campaign expiry without conversion</strong></span>
+      </div>
+
+      <div class="action-pill" id="actionPill">
+        <span class="action-pill__icon action-pill__icon--esp" id="actionPillIcon" aria-hidden="true">📩</span>
+        <div class="action-pill__body">
+          <div class="action-pill__name" id="actionPillName">Email tag</div>
+          <div class="action-pill__desc" id="actionPillDesc">Tag the user in your email tool.</div>
+        </div>
+        <button class="text-link" data-action="change-action">Change</button>
+      </div>
+
+      <div class="configure__section" id="configureBody"></div>
+
+      <div class="optional-block" id="timingBlock">
+        <div class="optional-block__collapsed" id="timingCollapsed">
+          <button class="text-link text-link--primary" data-action="add-delay">+ Add a delay</button>
+          <span class="optional-block__hint">fires immediately by default</span>
+        </div>
+        <div class="optional-block__expanded" id="timingExpanded" hidden>
+          <div class="optional-block__label">When should this fire?</div>
+          <div class="optional-block__row">
+            <span class="kw">FIRE</span>
+            <input type="number" class="input input--sm" id="timingValue" min="1" value="1" />
+            <select class="input input--sm" id="timingUnit">
+              <option value="minutes">minutes</option>
+              <option value="hours">hours</option>
+              <option value="days" selected>days</option>
+              <option value="weeks">weeks</option>
+            </select>
+            <span class="kw-trail">after the countdown expires</span>
+          </div>
+          <button class="text-link text-link--muted" data-action="remove-delay">Remove delay</button>
+        </div>
+      </div>
+
+      <div class="optional-block" id="conditionBlock">
+        <div class="optional-block__collapsed" id="conditionCollapsed">
+          <button class="text-link text-link--primary" data-action="add-condition">+ Add a condition</button>
+          <span class="optional-block__hint">always runs by default</span>
+        </div>
+        <div class="optional-block__expanded" id="conditionExpanded" hidden>
+          <div class="optional-block__label">Only fire if…</div>
+          <div class="optional-block__row">
+            <span class="kw">IF</span>
+            <select class="input input--sm" id="conditionField">
+              <option>email</option>
+              <option>user_id</option>
+              <option>campaign_id</option>
+            </select>
+            <select class="input input--sm" id="conditionOp">
+              <option value="equals">equals</option>
+              <option value="not_equals">does not equal</option>
+              <option value="contains">contains</option>
+            </select>
+            <input type="text" class="input input--sm" id="conditionValue" placeholder="value" />
+          </div>
+          <button class="text-link text-link--muted" data-action="remove-condition">Remove condition</button>
+        </div>
+      </div>
+
+      <div class="cta-row">
+        <button class="btn btn--primary btn--xl" id="saveActionBtn">Save &amp; Activate</button>
+        <button class="text-link text-link--muted" data-action="back-to-campaign">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       VIEW 4 — Trigger Source flow (Add / edit)
+  ================================================================== -->
+  <section id="sourceFlowView" class="view" hidden>
+    <div class="back-row">
+      <button class="text-link text-link--muted" data-action="back-to-campaign">‹ Back to campaign</button>
+    </div>
+
+    <div class="edit-title-row">
+      <h1 class="edit-title-row__title" id="sourceEditTitle">Add a trigger source</h1>
+      <p class="edit-title-row__sub">What event should start this campaign's countdown for a user?</p>
+    </div>
+
+    <div class="picker__list" id="sourcePicker"></div>
+
+    <div class="stage stage-configure" data-stage="source-configure" hidden id="sourceConfigStage">
+      <div class="action-pill" id="sourcePill">
+        <span class="action-pill__icon action-pill__icon--webhook" id="sourcePillIcon" aria-hidden="true">🔌</span>
+        <div class="action-pill__body">
+          <div class="action-pill__name" id="sourcePillName">Incoming Webhook</div>
+          <div class="action-pill__desc" id="sourcePillDesc">An external system POSTs to a per-campaign URL to start the countdown for a user.</div>
+        </div>
+        <button class="text-link" data-action="change-source">Change</button>
+      </div>
+
+      <div class="configure__section" id="sourceConfigBody"></div>
+
+      <div class="cta-row">
+        <button class="btn btn--primary btn--xl" id="saveSourceBtn">Save &amp; Activate</button>
+        <button class="text-link text-link--muted" data-action="back-to-campaign">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast-rail" id="toastRail" aria-live="polite" aria-atomic="false"></div>
+
+<div class="popover" id="cardPopover" hidden></div>
+
+<div class="modal" id="confirmModal" role="dialog" aria-modal="true" hidden>
+  <div class="modal-panel">
+    <h2 id="confirmTitle">Remove this?</h2>
+    <p id="confirmBody">It will stop firing. You can undo this for 5 seconds.</p>
+    <footer class="modal-footer">
+      <button class="btn btn--ghost" data-action="cancel-confirm">Keep it</button>
+      <button class="btn btn--danger" id="confirmRemoveBtn">Remove</button>
+    </footer>
+  </div>
+  <div class="modal-scrim" data-action="cancel-confirm"></div>
+</div>
+
+<script src="ultimatum-lifecycle.js"></script>
+</body>
+</html>
